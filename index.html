@@ -1244,7 +1244,7 @@
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-10-22 12:40 (диагностика: открытие, скачивание и отправка PDF)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-10-23 00:15 (диагностика восстановления копии: срок действия ожиданий)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -1631,7 +1631,8 @@ const DIAG = (() => {
   const MAX = 1500, TTL = 30 * 24 * 3600 * 1000, MAX_D = 1800, CLOUD_MAX_PER_SESSION = 400;
   const IMPORTANT = new Set(['note.vanished', 'notes.mass-vanish', 'firestore.removed', 'sync.reconcile', 'cloud.delete.intent',
     'cloud.commit.fail', 'state.replace', 'purge.trash', 'note.trash', 'note.restore', 'note.archive', 'note.unarchive',
-    'note.delivered', 'note.undelivered', 'note.delete.permanent', 'sync.conflict', 'js.error', 'js.rejection', 'cache.owner.switch', 'auth.state']);
+    'note.delivered', 'note.undelivered', 'note.delete.permanent', 'sync.conflict', 'js.error', 'js.rejection', 'cache.owner.switch', 'auth.state',
+    'backup.restore.start', 'backup.restore.plan', 'backup.restore.ok', 'backup.restore.fail', 'backup.restore.mismatch']);
   // Короткий необратимый хеш uid: в журнале и экспорте самого uid нет, но записи разных аккаунтов на одном телефоне не смешиваются.
   function hashUid(x){
     x = String(x); let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -1647,7 +1648,7 @@ const DIAG = (() => {
   try{ const co = localStorage.getItem(CACHE_OWNER_LIT); if(co) ownerInit = hashUid(co); }catch(e){}
   const S = { buf: [], seq: 0, flushT: null, rawLen: -1, err: '', prev: null, gone: new Map(), ctx: null, lastUI: null,
     owner: ownerInit, authAt: 0, lsCache: null, flags: {}, enableGen: 0, cleaning: false, cleanTry: 0, cleanFailLogged: false,
-    cloudSent: 0, remote: [], internalErrors: 0, lastKey: '', lastKeyTs: 0, inCon: false, viewSig: '' };
+    cloudSent: 0, remote: [], internalErrors: 0, lastKey: '', lastKeyTs: 0, inCon: false, viewSig: '', restore: null };
   let dev = '';
   try{ dev = localStorage.getItem(DEV_KEY) || ''; if(!dev){ dev = Math.random().toString(36).slice(2, 6); localStorage.setItem(DEV_KEY, dev); } }catch(e){ dev = dev || ('t' + Math.random().toString(36).slice(2, 5)); }
   const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
@@ -1742,6 +1743,7 @@ const DIAG = (() => {
       if(S.buf.length > MAX + 100) S.buf = S.buf.slice(S.buf.length - MAX);
       if(o.now) flush(); else if(lv !== 'info') schedule(0); else schedule(5000); // обычные события — пакетом раз в 5 с (не нагружаем запись); важные — сразу
       if(lv !== 'info' || IMPORTANT.has(type)) cloudSend(e);
+      if(type === 'cloud.commit.ok' && S.restore && S.restore.state === 'unconfirmed') restoreLateCheck();
       return e;
     }catch(_){ return null; }
   }
@@ -1805,21 +1807,36 @@ const DIAG = (() => {
       cur.forEach((c, id) => {
         const p = S.prev.get(id);
         if(!p){
-          log('note.new', 'info', srcNow(), { id, num: c.num, msg: 'Заявка появилась в памяти (' + where + ')', d: { after: c } });
+          restoreRevive(id);
+          const gop = restoreGained(id);
+          log('note.new', 'info', srcNow(), { id, num: c.num, msg: (gop ? 'Заявка появилась из восстановленной копии (' : 'Заявка появилась в памяти (') + where + ')', d: gop ? { after: c, opId: gop } : { after: c } });
           S.gone.delete(id);
           return;
         }
         const ch = changes(p, c);
         if(ch) log(typeFor(ch), 'info', srcNow(), { id, num: c.num, msg: 'Изменение заявки (' + where + ')', d: { ch } });
       });
+      // Заявки, которые пропали по списку замены выбранной копии (восстановление), — это ожидаемая замена: информация.
+      // Всё, чего в этом списке нет, остаётся предупреждением / ошибкой, как и раньше.
+      const expV = [], unexpV = [];
       vanished.forEach(([id, p]) => {
-        S.gone.set(id, { last: p, at: Date.now(), where });
+        const op = restoreExpected(id);
+        S.gone.set(id, op ? { last: p, at: Date.now(), where, op } : { last: p, at: Date.now(), where });
         if(S.gone.size > 300){ const k = S.gone.keys().next().value; S.gone.delete(k); }
-        log('note.vanished', 'warn', srcNow(), { id, num: p.num, now: true,
-          msg: 'Заявка пропала из массива notes (' + where + '). Причина по одному этому событию не определена.',
-          d: { where, last: p, inLastSynced: safeGet(() => lastSyncedNotes.has(id), null), inPendingDelete: safeGet(() => pendingDeletedNoteIds.indexOf(id) !== -1, null), total: cur.size } });
+        (op ? expV : unexpV).push([id, p, op]);
       });
-      if(vanished.length >= 2) log('notes.mass-vanish', 'error', srcNow(), { now: true, msg: 'За один шаг из notes пропало заявок: ' + vanished.length + ' (' + where + ')', d: { ids: vanished.slice(0, 15).map(v => [v[0], v[1].num]), total: cur.size } });
+      const rcOp = restoreActiveId();
+      expV.slice(0, 20).forEach(([id, p, op]) => log('note.replaced', 'info', srcNow(), { id, num: p.num,
+        msg: 'Заявка заменена в результате восстановления резервной копии (' + where + ')', d: { opId: op, last: p } }));
+      if(expV.length) log('backup.restore.replaced', 'info', srcNow(), { now: true,
+        msg: 'Заявки заменены в результате восстановления резервной копии: исчезло ' + expV.length + ' (по списку замены этой копии)',
+        d: { opId: expV[0][2], count: expV.length, ids: expV.slice(0, 15).map(v => [v[0], v[1].num]), planned: S.restore ? S.restore.lost.size : null, total: cur.size } });
+      unexpV.forEach(([id, p]) => {
+        log('note.vanished', 'warn', srcNow(), { id, num: p.num, now: true,
+          msg: 'Заявка пропала из массива notes (' + where + '). Причина по одному этому событию не определена.' + (rcOp ? ' Во время восстановления копии (' + rcOp + ') эта заявка в список замены НЕ входила.' : ''),
+          d: { where, last: p, inLastSynced: safeGet(() => lastSyncedNotes.has(id), null), inPendingDelete: safeGet(() => pendingDeletedNoteIds.indexOf(id) !== -1, null), total: cur.size, restoreOp: rcOp || undefined } });
+      });
+      if(unexpV.length >= 2) log('notes.mass-vanish', 'error', srcNow(), { now: true, msg: 'За один шаг из notes пропало заявок: ' + unexpV.length + ' (' + where + ')' + (expV.length ? '; ещё ' + expV.length + ' заменены восстановлением копии (ожидаемо)' : ''), d: { ids: unexpV.slice(0, 15).map(v => [v[0], v[1].num]), total: cur.size, restoreOp: rcOp || undefined } });
       S.prev = cur;
       if(S.ctxUsed){ S.ctx = null; S.ctxUsed = false; }
     }catch(e){ internalError(e); }
@@ -1835,11 +1852,198 @@ const DIAG = (() => {
       const lost = cur.filter(n => n && n.id != null && !incIds.has(String(n.id)));
       const gained = inc.filter(n => n && n.id != null && !curIds.has(String(n.id)));
       S.ctx = { kind, name, t: Date.now() };
-      log('state.replace', lost.length ? 'warn' : 'info', kind + ':' + name, { now: true,
-        msg: 'Массив notes будет заменён (' + name + '): сейчас ' + cur.length + ', станет ' + inc.length + ', исчезнет ' + lost.length + ', добавится ' + gained.length,
+      // замена при восстановлении копии, для которой уже построен список ожидаемых изменений (restorePlan), — не тревога
+      const expRestore = name === 'backup.restore.cloud' && S.restore && S.restore.state === 'running' && S.restore.planned && !S.restore.invalidNotes;
+      log('state.replace', (lost.length && !expRestore) ? 'warn' : 'info', kind + ':' + name, { now: true,
+        msg: 'Массив notes будет заменён (' + name + '): сейчас ' + cur.length + ', станет ' + inc.length + ', исчезнет ' + lost.length + ', добавится ' + gained.length + (expRestore ? ' — ожидаемая замена при восстановлении копии (' + S.restore.id + ')' : ''),
         d: Object.assign({ lost: lost.slice(0, 12).map(n => [String(n.id), n.number, mask(n.title || String(n.text || '').split('\n')[0]).slice(0, 30)]), gained: gained.length }, extra || {}) });
     }catch(e){ internalError(e); }
   }
+  // ---- восстановление копии: операция с идентификатором и список ожидаемых изменений по содержимому выбранной копии ----
+  const RESTORE_KEY = 'vreyse_diag_restore_op', RESTORE_GRACE_MS = 10 * 60 * 1000;
+  function restoreSave(){
+    try{
+      const r = S.restore;
+      if(r && r.state === 'running') localStorage.setItem(RESTORE_KEY, JSON.stringify({ opId: r.id, t0: r.t0, backup: r.backup, planned: r.planned, applied: r.applied, h: S.owner }));
+      else localStorage.removeItem(RESTORE_KEY);
+    }catch(_){}
+  }
+  function restoreCur(id){ const r = S.restore; return r && (id == null || r.id === id) ? r : null; }
+  // Список ожидаемых изменений действует:
+  //  - пока операция идёт (в том числе внутри applyState: running);
+  //  - после ЗАВЕРШЁННОЙ замены (applied): пока сервер не подтвердил (unconfirmed — без ограничения по времени) и ещё 10 минут после
+  //    конца операции (ok / ошибка отправки) — на запоздавшие подтверждения облака при плохой связи.
+  // Если восстановление закончилось неудачей ДО завершения замены (fail при applied=false), новые исчезновения штатными не считаются.
+  function restoreLive(r){
+    if(!r) return false;
+    if(r.state === 'running') return true;
+    if(!r.applied) return false;
+    if(r.state === 'unconfirmed') return true;
+    return Date.now() - r.endedAt <= RESTORE_GRACE_MS;
+  }
+  // Заявка с тем же ID снова появилась в памяти (добавлена заново с этого или другого телефона): любое следующее её удаление — новое
+  // самостоятельное событие и под прежнюю операцию не попадает. В r.lostAll остаётся полный список для итоговой сверки.
+  function restoreRevive(id){
+    try{
+      const r = S.restore;
+      if(r && r.lost.has(String(id))){ r.lost.delete(String(id)); r.revived = (r.revived || 0) + 1; }
+    }catch(_){}
+  }
+  function restoreActiveId(){ const r = S.restore; return r && restoreLive(r) ? r.id : null; }
+  function restoreExpected(id){
+    try{
+      const r = S.restore;
+      if(!r || !r.planned || !restoreLive(r)) return null;
+      return r.lost.has(String(id)) ? r.id : null;
+    }catch(_){ return null; }
+  }
+  function restoreGained(id){
+    try{
+      const r = S.restore;
+      if(!r || !r.planned || !restoreLive(r)) return null;
+      return r.gained.has(String(id)) ? r.id : null;
+    }catch(_){ return null; }
+  }
+  function restoreBegin(backup, extra){
+    try{
+      const prev = S.restore;
+      if(prev && prev.state === 'running') restoreFail(prev.id, 'superseded', null);
+      const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      S.restore = { id, t0: Date.now(), backup: String(backup == null ? '' : backup).slice(0, 60), state: 'running', planned: false, applied: false, invalidNotes: false, endedAt: 0,
+        lost: new Map(), lostAll: new Set(), revived: 0, gained: new Set(), changed: new Set(), keep: new Set() };
+      restoreSave();
+      log('backup.restore.start', 'info', 'restore:backup', { now: true, msg: 'Начато восстановление из резервной копии',
+        d: Object.assign({ opId: id, backup: S.restore.backup, notesNow: safeGet(() => notes.length, null) }, extra || {}) });
+      return id;
+    }catch(e){ internalError(e); return null; }
+  }
+  // Сравнение текущих заявок с содержимым выбранной копии — ДО замены: какие должны исчезнуть, появиться, измениться.
+  // planned = «замена запланирована/выполняется» (с этого момента исчезновения классифицируются по списку, в том числе внутри applyState);
+  // applied = «замена фактически завершена» (ставится restoreApplied только после нормального выхода из applyState).
+  function restorePlan(opId, incomingNotes){
+    try{
+      const r = restoreCur(opId);
+      if(!r || r.state !== 'running') return;
+      const cur = safeGet(() => notes, []) || [];
+      r.lost = new Map(); r.gained = new Set(); r.changed = new Set(); r.keep = new Set();
+      // В копии нет корректного массива notes: приложение всё равно заменит заявки пустым списком, но это НЕ штатная замена —
+      // список ожидаемых исчезновений остаётся пустым, и каждая пропавшая заявка будет записана как предупреждение.
+      if(!Array.isArray(incomingNotes)){
+        r.invalidNotes = true; r.planned = true;
+        restoreSave();
+        log('backup.restore.plan', 'warn', 'restore:backup', { now: true,
+          msg: 'В выбранной копии нет корректного списка заявок (notes). Исчезновение заявок при этом восстановлении НЕ считается штатным: сейчас заявок ' + cur.length,
+          d: { opId: r.id, backup: r.backup, now: cur.length, inCopy: null, notesInCopy: incomingNotes === undefined ? 'нет' : incomingNotes === null ? 'null' : typeof incomingNotes } });
+        return;
+      }
+      const inc = incomingNotes;
+      const curMap = new Map(), incMap = new Map();
+      cur.forEach(n => { if(n && n.id != null) curMap.set(String(n.id), n); });
+      inc.forEach(n => { if(n && n.id != null) incMap.set(String(n.id), n); });
+      r.keep = new Set(incMap.keys());
+      curMap.forEach((n, id) => {
+        if(!incMap.has(id)) r.lost.set(id, n.number == null ? null : n.number);
+        else if(changes(sum(n), sum(incMap.get(id)))) r.changed.add(id);
+      });
+      incMap.forEach((n, id) => { if(!curMap.has(id)) r.gained.add(id); });
+      r.lostAll = new Set(r.lost.keys());
+      r.planned = true;
+      restoreSave();
+      const numOf = (m, id) => { const n = m.get(id); return n && n.number != null ? n.number : null; };
+      log('backup.restore.plan', 'info', 'restore:backup', { now: true,
+        msg: 'Сравнение с выбранной копией: сейчас заявок ' + cur.length + ', в копии ' + inc.length + '; должно исчезнуть ' + r.lost.size + ', появиться ' + r.gained.size + ', измениться ' + r.changed.size,
+        d: { opId: r.id, backup: r.backup, now: cur.length, inCopy: inc.length,
+          remove: Array.from(r.lost.entries()).slice(0, 20), add: Array.from(r.gained).slice(0, 20).map(id => [id, numOf(incMap, id)]), change: Array.from(r.changed).slice(0, 20) } });
+    }catch(e){ internalError(e); }
+  }
+  // Вызывается ТОЛЬКО после того, как applyState(restoreData) вернулся без ошибки.
+  function restoreApplied(opId){
+    try{
+      const r = restoreCur(opId);
+      if(!r || r.state !== 'running' || !r.planned) return;
+      r.applied = true;
+      restoreSave();
+    }catch(e){ internalError(e); }
+  }
+  function restoreVerify(r){
+    const cur = safeGet(() => notes, []) || [];
+    const ids = new Set(cur.filter(n => n && n.id != null).map(n => String(n.id)));
+    const missing = [], resurrected = [];
+    r.keep.forEach(id => { if(!ids.has(id)) missing.push(id); });
+    r.lostAll.forEach(id => { if(ids.has(id)) resurrected.push(id); });
+    return { missing, resurrected };
+  }
+  function restoreOk(opId){
+    try{
+      const r = restoreCur(opId);
+      if(!r || (r.state !== 'running' && r.state !== 'unconfirmed')) return;
+      if(!r.applied) return;   // успех не объявляем, пока замена не завершена
+      const late = r.state === 'unconfirmed';
+      r.state = 'ok'; r.endedAt = Date.now(); restoreSave();
+      log('backup.restore.ok', 'info', 'restore:backup', { now: true,
+        msg: 'Восстановление завершено: сервер подтвердил сохранение' + (late ? ' (позже, чем ждало окно восстановления)' : '') + (r.invalidNotes ? '. В копии не было корректного списка заявок — это не штатная замена заявок' : '. Заявки заменены в результате восстановления резервной копии: исчезло ' + r.lost.size + ', появилось ' + r.gained.size + ', изменено ' + r.changed.size),
+        d: { opId: r.id, backup: r.backup, ms: Date.now() - r.t0, removed: r.lost.size, added: r.gained.size, changed: r.changed.size, late, notesNow: safeGet(() => notes.length, null) } });
+      if(r.invalidNotes) log('backup.restore.mismatch', 'warn', 'restore:backup', { now: true, msg: 'Копия не содержала корректного списка заявок: после восстановления на этом телефоне заявок ' + safeGet(() => notes.length, null), d: { opId: r.id, invalidNotes: true } });
+      const v = restoreVerify(r);
+      if(v.missing.length || v.resurrected.length) log('backup.restore.mismatch', 'warn', 'restore:backup', { now: true,
+        msg: 'После восстановления состав заявок не совпал с копией: не хватает ' + v.missing.length + ', лишних (должны были исчезнуть) ' + v.resurrected.length,
+        d: { opId: r.id, missing: v.missing.slice(0, 12), resurrected: v.resurrected.slice(0, 12) } });
+    }catch(e){ internalError(e); }
+  }
+  function restoreFail(opId, stage, e){
+    try{
+      const r = restoreCur(opId);
+      if(!r || (r.state !== 'running' && r.state !== 'unconfirmed')) return;
+      const why = mask(e && (e.code || e.message)) || '';
+      const applied = r.applied, planned = r.planned;
+      let lv = 'warn', msg, changedFlag = false;
+      if(stage === 'cloud-confirm' && applied){
+        r.state = 'unconfirmed'; r.endedAt = Date.now(); changedFlag = true;
+        msg = 'Восстановлено только на этом телефоне: сервер не подтвердил сохранение за отведённое время. Приложение повторит отправку само';
+      } else {
+        r.state = 'fail'; r.endedAt = Date.now();
+        if(applied){
+          lv = 'error'; stage = 'cloud-send'; changedFlag = true;
+          msg = 'Данные на этом телефоне заменены копией, но дальше произошла ошибка' + (why ? ' (' + why + ')' : '') + ': сохранение в облаке не подтверждено. Приложение повторит отправку само';
+        } else if(planned){
+          lv = 'error'; stage = 'apply'; changedFlag = 'unknown';
+          msg = 'Замена данных копией НЕ завершилась' + (why ? ' (' + why + ')' : '') + ': восстановление не применено полностью, заявки на этом телефоне могли измениться частично — проверьте данные';
+        } else {
+          msg = stage === 'superseded' ? 'Восстановление заменено новой попыткой, данные не менялись'
+            : stage === 'not-ready' ? 'Восстановление не начато: приложение ещё сверяет данные с сервером. Данные не менялись'
+            : 'Восстановление не выполнено, данные не менялись (' + (stage === 'emergency' ? 'аварийная копия не сохранена' : stage === 'prep' ? 'сейчас нельзя заменить данные' : 'копию не удалось получить') + (why ? ': ' + why : '') + ')';
+        }
+      }
+      restoreSave();
+      log('backup.restore.fail', lv, 'restore:backup', { now: true, msg, d: { opId: r.id, backup: r.backup, stage, planned, applied, dataChanged: changedFlag, ms: Date.now() - r.t0, removed: r.lost.size, added: r.gained.size, error: why || undefined } });
+    }catch(err){ internalError(err); }
+  }
+  // «Ждали подтверждения, оно пришло позже»: после очередной подтверждённой отправки проверяем общее состояние синхронизации
+  function restoreLateCheck(){
+    const r = S.restore, id = r && r.id;
+    setTimeout(() => {
+      try{
+        if(!S.restore || S.restore.id !== id || S.restore.state !== 'unconfirmed') return;
+        const p = safeGet(() => backupWaitSynced(null), null);
+        if(p && p.then) p.then(ok => { if(ok) restoreOk(id); }, () => {});
+      }catch(e){ internalError(e); }
+    }, 400);
+  }
+  // Прошлый запуск закрылся посреди восстановления: об этом остаётся запись (после app.start)
+  function restoreInterruptedCheck(){
+    try{
+      const raw = localStorage.getItem(RESTORE_KEY);
+      if(!raw) return;
+      localStorage.removeItem(RESTORE_KEY);
+      const o = JSON.parse(raw);
+      if(!o || o.h !== S.owner) return;
+      const ap = !!o.applied, pl = !!o.planned;
+      log('backup.restore.fail', ap || !pl ? 'warn' : 'error', 'restore:backup', { now: true,
+        msg: 'Восстановление было прервано: приложение закрыто или перезагружено до завершения. ' + (ap ? 'Данные на этом телефоне уже были заменены копией, отправка в облако могла не завершиться — приложение повторит отправку само.' : pl ? 'Замена данных была начата, но не завершена: заявки на этом телефоне могли измениться частично — проверьте данные.' : 'Данные заменены не были.'),
+        d: { opId: o.opId, backup: o.backup, stage: 'interrupted', planned: pl, applied: ap, dataChanged: ap ? true : pl ? 'unknown' : false, sinceMs: Date.now() - (o.t0 || Date.now()) } });
+    }catch(e){ internalError(e); }
+  }
+
   function mark(name, kind){ S.ctx = { kind: kind || 'local', name, t: Date.now() }; }
   function user(name, o){
     mark(name, 'user');
@@ -1970,7 +2174,7 @@ const DIAG = (() => {
       if(h === S.owner) return;
       diff('смена аккаунта');
       flush();
-      S.owner = h; S.prev = null; S.gone = new Map(); S.remote = []; S.ctx = null; S.enableGen++; S.cloudSent = 0; S.lastKey = ''; S.viewSig = ''; S.cleanFailLogged = false;
+      S.owner = h; S.prev = null; S.gone = new Map(); S.remote = []; S.ctx = null; S.enableGen++; S.cloudSent = 0; S.lastKey = ''; S.viewSig = ''; S.cleanFailLogged = false; S.restore = null; try{ localStorage.removeItem(RESTORE_KEY); }catch(_){}
       log('diag.owner', 'info', 'diag', { now: true, msg: h ? 'Журнал переключён на другой аккаунт' : 'Журнал: выход из аккаунта' });
       scheduleCleanup(30000, false);
     }catch(e){ internalError(e); }
@@ -2147,9 +2351,11 @@ const DIAG = (() => {
 
   load();
   log('app.start', 'info', 'device', { now: true, msg: 'Запуск приложения', d: { sid, dev: devLabel, v: safeGet(() => (document.getElementById('appVersionLine') || {}).textContent, '').slice(0, 90) } });
+  restoreInterruptedCheck();
 
   return {
     log, diff, mark, user, replaceIntent, internalError, flush, viewTick, sum, status,
+    restoreBegin, restorePlan, restoreApplied, restoreOk, restoreFail, restoreExpected,
     sid, dev: devLabel, S,
     entries: () => S.buf.filter(visible).concat(S.remote).sort((a, b) => b.ts - a.ts || (b.n || 0) - (a.n || 0)),
     setOwner, hash: hashUid, cleanupNow: maybeCleanup, cloudOn: cloudOnNow, enableCloud, disableCloud, loadRemote, storageError: () => S.err
@@ -2160,13 +2366,23 @@ const DIAG = (() => {
 function diagFlushIntent(ops){
   const dels = ops.filter(o => o.action === 'delete' && o.kind === 'note');
   const sets = ops.filter(o => o.action === 'set' && o.kind === 'note').length;
-  dels.slice(0, 20).forEach(o => {
+  // удаления, которые входят в список замены восстановленной копии, — ожидаемые (информация); остальные — предупреждения, как раньше
+  const expDels = [], realDels = [];
+  dels.forEach(o => { const op = DIAG.restoreExpected(o.id); (op ? expDels : realDels).push([o, op]); });
+  realDels.slice(0, 20).forEach(([o]) => {
     const g = DIAG.S.gone.get(String(o.id));
     DIAG.log('cloud.delete.intent', 'warn', 'local:flushCloudSave', { id: o.id, num: g && g.last ? g.last.num : null, now: true,
       msg: 'В облако будет отправлено УДАЛЕНИЕ заявки: её нет в локальном notes, но она числится синхронизированной. Почему её нет локально — смотрите события note.vanished/state.replace по этому ID.',
       d: { lastKnownLocal: g ? g.last : null, vanishedAt: g ? g.at : null, vanishedWhere: g ? g.where : null, pendingDelete: pendingDeletedNoteIds.indexOf(String(o.id)) !== -1, localCount: notes.length } });
   });
-  if(dels.length > 20) DIAG.log('cloud.delete.intent', 'error', 'local:flushCloudSave', { now: true, msg: 'Всего удалений заявок в облаке в этой отправке: ' + dels.length + ' (показаны первые 20)' });
+  expDels.slice(0, 20).forEach(([o, op]) => {
+    const g = DIAG.S.gone.get(String(o.id));
+    DIAG.log('cloud.delete.expected', 'info', 'local:flushCloudSave', { id: o.id, num: g && g.last ? g.last.num : null, now: true,
+      msg: 'В облако отправляется удаление заявки, заменённой при восстановлении резервной копии (ожидаемо)',
+      d: { opId: op, lastKnownLocal: g ? g.last : null, pendingDelete: pendingDeletedNoteIds.indexOf(String(o.id)) !== -1, localCount: notes.length } });
+  });
+  if(realDels.length > 20) DIAG.log('cloud.delete.intent', 'error', 'local:flushCloudSave', { now: true, msg: 'Всего удалений заявок в облаке в этой отправке: ' + realDels.length + ' (показаны первые 20)' });
+  if(expDels.length > 20) DIAG.log('cloud.delete.expected', 'info', 'local:flushCloudSave', { now: true, msg: 'Всего ожидаемых удалений при восстановлении копии в этой отправке: ' + expDels.length + ' (показаны первые 20)' });
   if(dels.length) DIAG.log('cloud.commit.start', 'info', 'local:flushCloudSave', { msg: 'Отправка: записей ' + sets + ', удалений ' + dels.length });
 }
 let idSeq = 1;
@@ -13471,7 +13687,7 @@ function subscribeCloud(userRef, onBaselineReady, knownNoteIdsAtStart, writesAll
       }
       if(change.type === 'removed'){
         const idxDel = notes.findIndex(n => String(n.id) === id);
-        diagSafe(() => { const ln = idxDel !== -1 ? notes[idxDel] : null; const ke = lastSyncedNotes.get(id); const le = ln ? (ln.editedAt || ln.createdAt || 0) : null; DIAG.mark('firestore.removed', 'firebase'); DIAG.log('firestore.removed', 'warn', 'firebase:onSnapshot', { id, num: ln ? ln.number : null, now: true, msg: 'Firestore прислал removed для заявки. Причина удаления в облаке неизвестна (другое устройство, этот телефон или правила Firestore).', d: { inLocalNotes: idxDel !== -1, localEditedAt: le, knownCloudEditedAt: ke == null ? null : ke, localNewerSoKept: ln ? (ke != null && le > ke) : null, fromCache: snapshot.metadata.fromCache, snapshotPending: snapshot.metadata.hasPendingWrites, docPending: change.doc.metadata.hasPendingWrites, local: ln ? DIAG.sum(ln) : (DIAG.S.gone.get(id) || null) } }); });
+        diagSafe(() => { const ln = idxDel !== -1 ? notes[idxDel] : null; const ke = lastSyncedNotes.get(id); const le = ln ? (ln.editedAt || ln.createdAt || 0) : null; DIAG.mark('firestore.removed', 'firebase'); const rop = ln ? null : DIAG.restoreExpected(id); if(rop){ const gg = DIAG.S.gone.get(id); DIAG.log('cloud.removed.expected', 'info', 'firebase:onSnapshot', { id, num: gg && gg.last ? gg.last.num : null, now: true, msg: 'Облако подтвердило удаление заявки, заменённой при восстановлении резервной копии (ожидаемо)', d: { opId: rop, fromCache: snapshot.metadata.fromCache, docPending: change.doc.metadata.hasPendingWrites } }); return; } DIAG.log('firestore.removed', 'warn', 'firebase:onSnapshot', { id, num: ln ? ln.number : null, now: true, msg: 'Firestore прислал removed для заявки. Причина удаления в облаке неизвестна (другое устройство, этот телефон или правила Firestore).', d: { inLocalNotes: idxDel !== -1, localEditedAt: le, knownCloudEditedAt: ke == null ? null : ke, localNewerSoKept: ln ? (ke != null && le > ke) : null, fromCache: snapshot.metadata.fromCache, snapshotPending: snapshot.metadata.hasPendingWrites, docPending: change.doc.metadata.hasPendingWrites, local: ln ? DIAG.sum(ln) : (DIAG.S.gone.get(id) || null) } }); });
         if(idxDel !== -1){
           const localEt = notes[idxDel].editedAt || notes[idxDel].createdAt || 0;
           const knownEt = lastSyncedNotes.get(id);
@@ -14333,7 +14549,9 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
               const restoreBtn = row.querySelector('button');
               // Заменять данные можно только когда все три раздела уже сверены с сервером и отправка разрешена: иначе первый
               // серверный снимок вернул бы в Автосервис/«Мой автомобиль»/заявки старые записи, которых нет в копии.
+              const opId = diagSafe(() => DIAG.restoreBegin(doc.id, { storage: isStorageBackup, backupNotes: isStorageBackup ? ((data.backupCounts || {}).notes != null ? data.backupCounts.notes : null) : (data.notes || []).length }));
               if(!backupBaselinesReady()){
+                diagSafe(() => DIAG.restoreFail(opId, 'not-ready', null));
                 showToast('Восстановление не начато: приложение ещё сверяет данные с сервером (или отправка в облако не разрешена). Подождите немного и повторите.', 7000);
                 return;
               }
@@ -14357,8 +14575,10 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
                   if(currentUID !== restoreUid || !backupBaselinesReady()) throw Object.assign(new Error('state changed'), { code: 'backup/state-changed', backupStage: 'prep' }); // пока качали и сохраняли аварийную копию, вход/сверка изменились — данные не трогаем
                 })
                 .then(() => Promise.resolve().then(() => {
-                  diagSafe(() => DIAG.replaceIntent('backup.restore.cloud', 'restore', restoreData && restoreData.notes, { backup: String(preRestoreKey) }));
+                  diagSafe(() => DIAG.restorePlan(opId, restoreData && restoreData.notes));
+                  diagSafe(() => DIAG.replaceIntent('backup.restore.cloud', 'restore', restoreData && restoreData.notes, { backup: String(preRestoreKey), opId }));
                   applyState(restoreData);
+                  diagSafe(() => DIAG.restoreApplied(opId));
                   backupReconcileDeleteQueues();
                   expectRestored = { svc: backupExpectedFrom(serviceFolders), car: backupExpectedFrom(serviceCarNotes) };
                   carPersistLocal();
@@ -14373,8 +14593,9 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
                   setCloudSyncStatus('pending');
                   return backupConfirmRestore(flushCloudSave(), expectRestored);
                 })
-                .then(synced => showToast(synced ? 'Данные восстановлены из копии и сохранены в облаке' : 'Восстановлено только на этом телефоне: в облако ещё не отправлено, приложение повторит отправку само', synced ? undefined : 7000))
+                .then(synced => { diagSafe(() => synced ? DIAG.restoreOk(opId) : DIAG.restoreFail(opId, 'cloud-confirm', null)); return showToast(synced ? 'Данные восстановлены из копии и сохранены в облаке' : 'Восстановлено только на этом телефоне: в облако ещё не отправлено, приложение повторит отправку само', synced ? undefined : 7000); })
                 .catch(e => {
+                  diagSafe(() => DIAG.restoreFail(opId, 'cloud-send', e));
                   console.warn('Не удалось сохранить восстановленные данные в облако:', e);
                   showToast('Восстановлено локально, но не удалось отправить в облако — проверьте связь');
                 })
@@ -14384,6 +14605,7 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
                   svcRerenderIfVisible();
                   backupsOverlay.style.display = 'none';
                 }), e => {
+                  diagSafe(() => DIAG.restoreFail(opId, (e && e.backupStage) || 'download', e));
                   console.warn('Восстановление отменено, данные не менялись:', e);
                   restoreBtn.disabled = false;
                   restoreBtn.textContent = 'Восстановить';
@@ -14974,7 +15196,7 @@ function refreshFromCloudOnResume(){
       }
       if(!serverNoteIds.has(id)){
         const idxDel = notes.findIndex(n => String(n.id) === id);
-        diagSafe(() => { const ln = idxDel !== -1 ? notes[idxDel] : null; const ke = lastSyncedNotes.get(id); const le = ln ? (ln.editedAt || ln.createdAt || 0) : null; DIAG.mark('cloud.reload.compare', 'firebase'); DIAG.log('firestore.removed', 'warn', 'firebase:полная загрузка/возврат в приложение', { id, num: ln ? ln.number : null, now: true, msg: 'При полной загрузке заявки с сервера нет (а раньше была синхронизирована). Причина отсутствия в облаке неизвестна.', d: { inLocalNotes: idxDel !== -1, localEditedAt: le, knownCloudEditedAt: ke == null ? null : ke, localNewerSoKept: ln ? (ke != null && le > ke) : null, serverCount: serverNoteIds.size, local: ln ? DIAG.sum(ln) : null } }); });
+        diagSafe(() => { const ln = idxDel !== -1 ? notes[idxDel] : null; const ke = lastSyncedNotes.get(id); const le = ln ? (ln.editedAt || ln.createdAt || 0) : null; DIAG.mark('cloud.reload.compare', 'firebase'); const rop = ln ? null : DIAG.restoreExpected(id); if(rop){ const gg = DIAG.S.gone.get(id); DIAG.log('cloud.removed.expected', 'info', 'firebase:полная загрузка/возврат в приложение', { id, num: gg && gg.last ? gg.last.num : null, now: true, msg: 'При полной загрузке заявки нет на сервере: это заявка, заменённая при восстановлении резервной копии (ожидаемо)', d: { opId: rop, serverCount: serverNoteIds.size } }); return; } DIAG.log('firestore.removed', 'warn', 'firebase:полная загрузка/возврат в приложение', { id, num: ln ? ln.number : null, now: true, msg: 'При полной загрузке заявки с сервера нет (а раньше была синхронизирована). Причина отсутствия в облаке неизвестна.', d: { inLocalNotes: idxDel !== -1, localEditedAt: le, knownCloudEditedAt: ke == null ? null : ke, localNewerSoKept: ln ? (ke != null && le > ke) : null, serverCount: serverNoteIds.size, local: ln ? DIAG.sum(ln) : null } }); });
         // Та же защита, что и в живой подписке: не стираем локальную правку,
         // которая новее того, что мы в последний раз подтверждённо получали
         // с сервера, — иначе можно потерять правку, сделанную прямо перед тем,
