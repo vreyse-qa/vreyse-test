@@ -1244,7 +1244,7 @@
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-10-23 00:15 (диагностика восстановления копии: срок действия ожиданий)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-10-24 17:15 (проверка скачивания большой копии)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -13175,6 +13175,168 @@ function backupDownload(uid, rec){
     return obj;
   });
 }
+// ===== Проверка скачивания большой копии: ТОЛЬКО ЧТЕНИЕ =====
+// Ничего не записывает (ни в Firestore, ни в Storage, ни в память телефона), не меняет заявки и копии и не вызывает
+// восстановление. Показывает, на каком шаге и с какой ошибкой не скачивается файл копии. Токены, адрес файла с токеном,
+// полный UID и содержимое файла в отчёт не попадают.
+let backupProbeBusy = false;
+function backupProbeRedact(s, uid){
+  let t = String(s == null ? '' : s);
+  t = t.replace(/token=[^&\s"'<>»]+/gi, 'token=[скрыто]')
+       .replace(/eyJ[A-Za-z0-9_\-.]{20,}/g, '[jwt скрыт]')
+       .replace(/\b(Bearer|Firebase)\s+[A-Za-z0-9_\-.]{20,}/g, '$1 [скрыто]')
+       .replace(/AIza[0-9A-Za-z_\-]{20,}/g, '[ключ скрыт]');
+  if(uid){ t = t.split(uid).join(String(uid).slice(0, 6) + '…'); }
+  return t;
+}
+function backupProbeErr(e, uid){
+  if(!e) return 'неизвестная ошибка';
+  const parts = [];
+  parts.push((e.name || 'Error'));
+  if(e.code) parts.push('code=' + e.code);
+  const st = e.status_ != null ? e.status_ : (e.customData && e.customData.status != null ? e.customData.status : null);
+  if(st != null) parts.push('http=' + st);
+  if(e.message) parts.push('«' + backupProbeRedact(String(e.message).slice(0, 200), uid).replace(/»/g, '') + '»');
+  const sr = e.customData && e.customData.serverResponse;
+  if(sr) parts.push('ответ сервера: ' + backupProbeRedact(String(sr).slice(0, 150), uid));
+  return parts.join(' · ');
+}
+function backupProbeShow(text){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:130;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--surface, #fff);color:var(--ink, #111);border-radius:12px;padding:14px;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;gap:10px;';
+  const h = document.createElement('div');
+  h.style.cssText = 'font-size:14px;font-weight:600;';
+  h.textContent = 'Проверка скачивания копии (только чтение)';
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'margin:0;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-word;overflow:auto;flex:1;min-height:80px;user-select:text;-webkit-user-select:text;';
+  pre.textContent = text;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+  const mk = (label, primary) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.style.cssText = 'border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;' + (primary ? 'background:#2563eb;color:#fff;border:none;' : 'background:transparent;color:var(--muted);border:1px solid var(--card-line, #d0d0d0);'); return b; };
+  const copyBtn = mk('Копировать', true), closeBtn = mk('Закрыть', false);
+  copyBtn.addEventListener('click', () => {
+    const done = () => { copyBtn.textContent = 'Скопировано'; };
+    const fallback = () => { try{ const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }catch(_){ copyBtn.textContent = 'Выделите текст вручную'; } };
+    try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, fallback); } else fallback(); }catch(_){ fallback(); }
+  });
+  closeBtn.addEventListener('click', () => ov.remove());
+  row.appendChild(copyBtn); row.appendChild(closeBtn);
+  box.appendChild(h); box.appendChild(pre); box.appendChild(row); ov.appendChild(box);
+  document.body.appendChild(ov);
+}
+async function backupProbeDownload(uid, key, rec, btn){
+  if(backupProbeBusy) return;
+  if(!uid || !rec) return;
+  backupProbeBusy = true;
+  const oldLabel = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Проверяю…'; }
+  const lines = [];
+  const res = {};   // итог каждого шага: 'ok' | 'fail' | 'skip'
+  const T = 20000;
+  const add = (s) => lines.push(backupProbeRedact(s, uid));
+  const run = async (id, title, fn) => {
+    const t0 = Date.now();
+    try{
+      const info = await backupWithTimeout(fn(), T);
+      res[id] = 'ok';
+      add(id + ' ' + title + ' — ОК (' + (Date.now() - t0) + ' мс)' + (info ? ': ' + info : ''));
+    }catch(e){
+      res[id] = 'fail';
+      add(id + ' ' + title + ' — ОШИБКА (' + (Date.now() - t0) + ' мс): ' + backupProbeErr(e, uid));
+    }
+  };
+  const abortable = (fnWithSignal) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => { try{ ctrl.abort(); }catch(_){} }, T);
+    return fnWithSignal(ctrl).finally(() => clearTimeout(timer));
+  };
+  try{
+    const path = rec.backupPath;
+    const ref = storage.ref(path);
+    const opts = (firebase.app().options || {});
+    const bucket = opts.storageBucket;
+    // Н0 — окружение
+    add(((document.getElementById('appVersionLine') || {}).textContent) || 'Версия: ?');
+    add('Время: ' + new Date().toISOString());
+    add('Адрес сайта: ' + location.origin);
+    add('В сети: ' + navigator.onLine + ' · service worker управляет страницей: ' + (!!(navigator.serviceWorker && navigator.serviceWorker.controller)));
+    add('SDK: ' + (firebase.SDK_VERSION || '?') + ' · getBytes: ' + typeof ref.getBytes + ' · getMetadata: ' + typeof ref.getMetadata + ' · getDownloadURL: ' + typeof ref.getDownloadURL);
+    add('Бакет: ' + bucket + ' · вход: ' + (auth.currentUser ? 'да (' + String(uid).slice(0, 6) + '…)' : 'НЕТ'));
+    add('Копия: ' + key + ' · формат ' + rec.backupFormat + ' · ожидаемый размер ' + rec.backupSize + ' · заявок ' + ((rec.backupCounts || {}).notes));
+    add('');
+    // Н1 — путь
+    const okPath = backupPathOk(uid, path), same = path === backupStoragePath(uid, key);
+    res.S1 = (okPath && same) ? 'ok' : 'fail';
+    add('S1 путь файла — ' + (res.S1 === 'ok' ? 'ОК' : 'ОШИБКА') + ': допустимый ' + okPath + ', совпадает с ключом копии ' + same);
+    if(!auth.currentUser){ add('Нет входа — дальше проверять нечего.'); throw new Error('stop'); }
+    // S2 — метаданные через SDK
+    await run('S2', 'getMetadata (SDK)', () => ref.getMetadata().then(m => 'размер ' + m.size + (rec.backupSize != null ? (m.size === rec.backupSize ? ' (совпадает)' : ' (НЕ совпадает с ' + rec.backupSize + ')') : '') + ', тип ' + m.contentType));
+    // S3 — байты через SDK
+    if(typeof ref.getBytes === 'function'){
+      await run('S3', 'getBytes (SDK)', () => ref.getBytes(BACKUP_STORAGE_MAX_BYTES).then(buf => {
+        let ok = false, n = null;
+        try{ const o = JSON.parse(new TextDecoder().decode(buf)); ok = true; n = Array.isArray(o.notes) ? o.notes.length : null; }catch(_){}
+        return buf.byteLength + ' байт' + (rec.backupSize != null ? (buf.byteLength === rec.backupSize ? ' (совпадает)' : ' (НЕ совпадает)') : '') + ', JSON ' + (ok ? 'корректный' : 'НЕкорректный') + ', заявок ' + n;
+      }));
+    }else{
+      res.S3 = 'skip'; add('S3 getBytes (SDK) — пропущен: метода getBytes в этой версии SDK нет');
+    }
+    // S4 — запасной путь приложения (fetch с Authorization)
+    const mediaUrl = 'https://firebasestorage.googleapis.com/v0/b/' + encodeURIComponent(bucket) + '/o/' + encodeURIComponent(path) + '?alt=media';
+    await run('S4', 'fetch как в приложении (с Authorization)', () => abortable(async (ctrl) => {
+      const tok = await auth.currentUser.getIdToken();
+      const r = await fetch(mediaUrl, { headers: { Authorization: 'Firebase ' + tok }, signal: ctrl.signal });
+      const info = 'HTTP ' + r.status + ', тип ответа ' + r.type + ', длина ' + (r.headers.get('content-length') || '?');
+      try{ ctrl.abort(); }catch(_){}
+      if(!r.ok){ const er = new Error('HTTP ' + r.status + ' (' + info + ')'); er.name = 'HttpError'; throw er; }
+      return info;
+    }));
+    // S5 — тот же адрес без авторизации (простой запрос, без предварительного)
+    await run('S5', 'fetch без Authorization и без токена', () => abortable(async (ctrl) => {
+      const r = await fetch(mediaUrl, { signal: ctrl.signal });
+      const info = 'ответ ПРОЧИТАН страницей: HTTP ' + r.status + ', тип ' + r.type;
+      try{ ctrl.abort(); }catch(_){}
+      return info;
+    }));
+    // S6 — адрес из getDownloadURL, простой GET
+    let dlUrl = null;
+    await run('S6', 'getDownloadURL (SDK)', () => ref.getDownloadURL().then(u => { dlUrl = u; return 'адрес получен (не показываю)'; }));
+    if(dlUrl){
+      await run('S7', 'простой GET по адресу из getDownloadURL', () => abortable(async (ctrl) => {
+        const r = await fetch(dlUrl, { cache: 'no-store', signal: ctrl.signal });
+        const info = 'ответ ПРОЧИТАН страницей: HTTP ' + r.status + ', тип ' + r.type + ', длина ' + (r.headers.get('content-length') || '?');
+        try{ ctrl.abort(); }catch(_){}
+        if(!r.ok){ const er = new Error('HTTP ' + r.status); er.name = 'HttpError'; throw er; }
+        return info;
+      }));
+      await run('S8', 'тот же адрес в режиме no-cors (достижим ли сервер)', () => abortable(async (ctrl) => {
+        const r = await fetch(dlUrl, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal });
+        const info = 'сервер ответил, тип ответа ' + r.type + ' (содержимое для страницы закрыто)';
+        try{ ctrl.abort(); }catch(_){}
+        return info;
+      }));
+    }else{ res.S7 = 'skip'; res.S8 = 'skip'; add('S7, S8 — пропущены: адрес не получен'); }
+    // Ориентировочный вывод (подсказка, не приговор)
+    add('');
+    let hint;
+    if(res.S3 === 'ok') hint = 'Через SDK (getBytes) копия скачивается. Если приложение при этом даёт «Failed to fetch», значит оно идёт запасным путём не через SDK.';
+    else if(res.S8 === 'ok' && res.S7 === 'fail' && res.S4 === 'fail') hint = 'Сервер достижим (S8), но ответ на настоящее скачивание страница прочитать не может (S4, S7). Это признак запрета CORS на скачивание файла для адреса ' + location.origin + '.';
+    else if(res.S8 === 'fail') hint = 'Сервер с этого телефона не отвечает даже в режиме no-cors: похоже на сеть, блокировку или обрыв, а не на CORS.';
+    else if(res.S7 === 'ok' && res.S4 === 'fail') hint = 'Простой запрос проходит, а запрос с Authorization — нет: дело в заголовке Authorization или предварительном запросе.';
+    else if(res.S4 === 'ok') hint = 'Запасной путь скачивания в этой проверке прошёл. Повторите проверку; если «Failed to fetch» остаётся — пришлите отчёт целиком.';
+    else hint = 'Однозначного вывода нет, отчёт нужно разобрать по шагам.';
+    add('Подсказка: ' + hint);
+  }catch(e){
+    if(!(e && e.message === 'stop')) add('Проверка прервана: ' + backupProbeErr(e, uid));
+  }finally{
+    backupProbeBusy = false;
+    if(btn){ btn.disabled = false; btn.textContent = oldLabel; }
+    backupProbeShow(lines.join('\n'));
+  }
+}
+
 function backupScheduleRetry(uid){
   if(backupRetryTimer) return;
   const delay = BACKUP_RETRY_DELAYS[Math.min(backupRetryStep, BACKUP_RETRY_DELAYS.length - 1)];
@@ -14537,8 +14699,13 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
             <div style="font-size:12px;color:var(--muted);">записей: ${itemsCount}</div>
             <div style="font-size:12px;color:var(--faint, #9aa0a6);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${previewText}</div>
           </div>
-          <button type="button" style="flex-shrink:0;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;">Восстановить</button>
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;align-items:stretch;">
+            <button type="button" style="flex-shrink:0;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;">Восстановить</button>
+            ${isStorageBackup ? '<button type="button" data-probe="1" style="background:transparent;color:var(--muted);border:1px solid var(--card-line, #d0d0d0);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Проверить скачивание</button>' : ''}
+          </div>
         `;
+        const probeBtn = row.querySelector('button[data-probe]');
+        if(probeBtn) probeBtn.addEventListener('click', () => { backupProbeDownload(currentUID, doc.id, data, probeBtn); });
         row.querySelector('button').addEventListener('click', () => {
           // Нативный confirm() ненадёжен в обёрнутом в APK WebView-приложении
           // (для RuStore) — может не показываться вовсе. Используем свой же
