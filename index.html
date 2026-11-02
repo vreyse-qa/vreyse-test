@@ -50,6 +50,8 @@
   .search input{border:none;background:none;outline:none;font-size:14.5px;color:var(--ink);width:100%;font-family:'Inter',sans-serif;}
   .avatar{width:28px;height:28px;border-radius:50%;background:#7c4dff;color:#fff;font-size:12.5px;
     font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  /* без сети показываем только значок «нет интернета»; значок ожидания отправки (#syncIcon) возвращается, когда сеть есть */
+  html.net-off #syncIcon{display:none !important;}
 
   main{flex:1;overflow-y:auto;padding:8px 12px 90px;position:relative;-webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;overflow-anchor:none;}
@@ -530,7 +532,7 @@
   .note .note-cargo .cargo-m + .cargo-d{margin-top:2px;}
   .note .note-cargo .cargo-d.two{margin-top:0;}
   /* «Доставляется»: две колонки — слева маршрут и груз, справа сумма и тип расчёта */
-  .note.lay2 .note-num{font-size:12px;font-weight:400;letter-spacing:0;line-height:1.3;color:#6B7280;margin-bottom:2px;padding-right:0;}
+  .note.lay2 .note-num{font-size:12px;font-weight:400;letter-spacing:0;line-height:1.3;color:#6B7280;margin-bottom:7px;padding-right:0;}
   .note.lay2 .note-num.fav-row{overflow:visible;}
   .note.lay2 .note-firm{font-size:14.5px;line-height:1.3;margin:0 0 6px;padding-right:0;}
   .note.lay2 .note-row{display:flex;align-items:flex-start;gap:10px;min-width:0;flex-shrink:0;}
@@ -539,7 +541,6 @@
   .note.lay2 .amount-badge,.note.lay2 .flag-tags{position:static;top:auto;right:auto;}
   .note.lay2 .amount-badge{font-size:16px;line-height:1.2;white-space:nowrap;justify-content:flex-end;}
   .note.lay2 .flag-tags{justify-content:flex-end;flex-wrap:wrap;}
-  .note.lay2 .flag-tag{font-size:12px;font-weight:600;line-height:1.2;}
   .note.lay2 .note-main p{padding-right:0;line-height:1.3;overflow-wrap:anywhere;}
   .note.lay2 .note-main p strong{font-size:18px;}
   .note.lay2 h4{font-size:21px;line-height:1.25;margin:0 0 4px;padding-right:0;overflow-wrap:anywhere;}
@@ -560,11 +561,11 @@
   .phone[data-theme="dark"] .note .note-cargo{color:#C3C8D0;}
   .inc-card .inc-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
   .inc-card .inc-amount{font-size:16px;font-weight:700;color:var(--ink);}
-  .inc-card .inc-type{font-size:12px;font-weight:600;line-height:1.2;color:var(--muted);margin-top:-1px;}
   .inc-card .inc-status{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;}
   .inc-card .inc-status.full{background:var(--tint-green-bg);color:#1e7e34;}
   .inc-card .inc-status.partial{background:var(--tint-amber-bg);color:var(--tint-warn-text);}
   .inc-card .inc-status.none{background:var(--concrete);color:var(--muted);}
+  .inc-card .inc-pay{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap;line-height:1.2;}
 
   /* ---- Окно добавления/редактирования расхода — выезжает снизу, рядом с клавиатурой ---- */
   .exp-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;
@@ -590,6 +591,31 @@
   .exp-amount-input{flex:1;border:none;outline:none;font-size:28px;font-weight:700;
     font-family:'Inter',sans-serif;color:var(--ink);min-width:0;}
   .exp-amount-suffix{font-size:20px;font-weight:700;color:var(--faint);}
+  .exp-liters-row{display:flex;align-items:center;gap:8px;border:1.5px solid var(--card-line);
+    border-radius:14px;padding:8px 16px;margin-top:10px;}
+  .exp-liters-input{flex:1;border:none;outline:none;font-size:20px;font-weight:700;
+    font-family:'Inter',sans-serif;color:var(--ink);min-width:0;background:transparent;}
+  .exp-liters-row .exp-amount-suffix{font-size:17px;}
+  .exp-liters-hint{font-size:12.5px;color:var(--faint);margin:6px 4px 0;min-height:0;}
+  .exp-liters-hint.err{color:var(--danger);}
+  .exp-liters-add{background:none;border:none;color:var(--muted);font-size:13.5px;font-weight:600;
+    cursor:pointer;padding:8px 4px 0;font-family:'Inter',sans-serif;}
+  .exp-card .exp-liters{font-size:12.5px;color:var(--muted);font-weight:600;}
+  .exp-card .exp-liters.none{color:var(--faint);font-weight:500;}
+  .fuel-block{background:var(--surface);border:1px solid var(--card-line);border-radius:18px;
+    box-shadow:0 6px 18px rgba(15,23,42,.045);padding:12px 16px;margin:0 0 12px;}
+  .fuel-block-title{font-size:13.5px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+  .fuel-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;font-size:14.5px;color:var(--ink);}
+  .fuel-row .fuel-lbl{min-width:0;}
+  .fuel-row .fuel-sub{display:block;font-size:11.5px;color:var(--faint);font-weight:500;}
+  .fuel-row .fuel-val{font-weight:700;text-align:right;white-space:nowrap;}
+  .fuel-row .fuel-val.warn{color:var(--warning);font-weight:600;white-space:normal;font-size:13.5px;}
+  .fuel-row .fuel-val.bad{color:var(--danger);font-weight:600;white-space:normal;font-size:13.5px;}
+  .fuel-in-wrap{display:flex;align-items:center;gap:6px;}
+  .fuel-in{width:96px;border:1.5px solid var(--card-line);border-radius:10px;padding:6px 10px;font-size:15px;
+    font-weight:700;font-family:'Inter',sans-serif;color:var(--ink);text-align:right;outline:none;background:transparent;}
+  .fuel-in:focus{border-color:var(--accent);}
+  .fuel-row.fuel-total{border-top:1px solid var(--card-line);margin-top:4px;padding-top:8px;}
   .exp-sheet-actions{display:flex;gap:10px;}
   .exp-delete-btn{flex:0 0 auto;background:var(--surface);border:1.5px solid #f28b82;color:#c5221f;
     border-radius:12px;padding:13px 18px;font-size:14.5px;font-weight:700;cursor:pointer;
@@ -1174,6 +1200,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="searchInput" placeholder="Поиск">
     </div>
+    <button type="button" id="offlineIcon" aria-label="Нет интернета" style="display:none;width:26px;height:26px;padding:0;margin:0;align-items:center;justify-content:center;background:none;border:none;outline:none;color:#b8bbc0;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 0-9h-1.8A6.5 6.5 0 1 0 6.5 19h11z"/><line x1="4" y1="4" x2="20" y2="20"/></svg></button>
     <div id="syncIcon" style="display:none;width:26px;height:26px;align-items:center;justify-content:center;font-size:15px;color:var(--muted);flex-shrink:0;" title="Не синхронизировано — ждём связи"></div>
     <div class="avatar" id="avatar">Я</div>
   </header>
@@ -1220,6 +1247,7 @@
     <div id="fuelSection" style="display:none;">
       <div class="nav-bar" ><button type="button" class="nav-back" data-nav-back aria-label="Назад"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span>Назад</span></button><span class="nav-title">Расходы</span></div>
       <div class="summary-bar" id="expSummaryBar" style="display:none;"></div>
+      <div class="fuel-block" id="expFuelBlock" style="display:none;"></div>
       <div class="exp-view-toggle" id="expViewToggle">
         <button class="exp-view-btn active" data-expview="history">История</button>
         <button class="exp-view-btn" data-expview="groups">По группам</button>
@@ -1244,7 +1272,7 @@
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-10-24 17:15 (проверка скачивания большой копии)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-02 15:38 (Топливо: отмена признака — настоящая отмена)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -1532,6 +1560,13 @@
       <input class="exp-amount-input" id="expAmountInput" inputmode="decimal" placeholder="0">
       <span class="exp-amount-suffix">₽</span>
     </div>
+    <div class="exp-liters-row" id="expLitersRow" style="display:none;">
+      <input class="exp-liters-input" id="expLitersInput" inputmode="decimal" placeholder="Количество литров">
+      <span class="exp-amount-suffix">л</span>
+    </div>
+    <div class="exp-liters-hint" id="expLitersHint" style="display:none;"></div>
+    <button type="button" class="exp-liters-add" id="expLitersAddBtn" style="display:none;">+ литры (заправка дизеля)</button>
+    <button type="button" class="exp-liters-add" id="expNotFuelBtn" style="display:none;"></button>
     <div class="exp-sheet-actions">
       <button class="exp-delete-btn" id="expDeleteBtn" style="display:none;">Удалить</button>
       <button class="exp-save-btn" id="expSaveBtn">Добавить</button>
@@ -2699,8 +2734,9 @@ function noteCardHtml(n, favInfo){
   const lay2 = view === 'notes' && !n.trashed && !n.archived && !n.delivered;
   if(lay2){
     const amountH = n.amount ? `<div class="amount-badge">${formatAmount(n.amount)}</div>` : '';
-    // тип расчёта под суммой — ровно один, по тому же правилу, что и фильтры (incCategoryOf): Нал / Без НДС / НДС
-    const flagsH = n.amount ? `<div class="flag-tags"><span class="flag-tag">${payTypeLabel(n)}</span></div>` : '';
+    // тип расчёта: «нал» / «без НДС» как раньше; обычный расчёт (по правилу incCategoryOf) — «с НДС»
+    const flagsH = (n.noNds || n.cash) ? `<div class="flag-tags">${n.noNds ? '<span class="flag-tag">без НДС</span>' : ''}${n.cash ? '<span class="flag-tag">нал</span>' : ''}</div>`
+      : (n.amount && incCategoryOf(n) === 'nds' ? '<div class="flag-tags"><span class="flag-tag">с НДС</span></div>' : '');
     const titleOrder = !!n.title && cargoOrderOk(n.text);
     const titleShown = titleOrder ? cargoRouteClean(n.title) : n.title;
     return `<div class="note lay2 ${isFav ? 'favorite' : ''} ${overdue ? 'due-overdue' : ''} ${(!overdue && !isFav && n.color && n.color !== 'default') ? 'tinted' : ''}" style="background:${overdue ? 'var(--tint-red-bg)' : (isFav ? 'var(--tint-fav-bg)' : colorHex(n.color))}" data-open="${n.id}">
@@ -2710,7 +2746,6 @@ function noteCardHtml(n, favInfo){
     ${n.pinned ? `<span class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l1.5 5.5L19 9l-5 3 1 6-3-3-3 3 1-6-5-3 5.5-1.5z"/></svg></span>` : ''}
     ${n.reminderAt ? `<span class="reminder-tag${n.reminderAt < Date.now() ? ' overdue' : ''}" style="right:${n.pinned ? 36 : 12}px;">🔔 ${formatReminderDate(n.reminderAt)}</span>` : ''}
     ${numberBlockHtml}
-    ${firmHtml}
     ${n.delivered ? '<div class="deliv-tag">✓ Доставлен</div>' : ''}
     ${n.syncConflict ? `<div style="display:inline-block;margin:0 0 4px;padding:2px 8px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:700;">⚠ Требует решения — изменилась на другом телефоне</div>` : ''}
     <div class="note-row"><div class="note-main">${titleShown ? `<h4${titleOrder ? ' class="rt"' : ''}>${escapeHtml(titleShown)}</h4>` : ''}${body}</div>${(amountH || flagsH) ? `<div class="note-side">${amountH}${flagsH}</div>` : ''}</div>
@@ -3935,7 +3970,9 @@ function offlineClassify(){
     if(editingNote && Array.isArray(editingNote.photoIds)) editingNote.photoIds.forEach((id) => { if(id) protect.add(id); });
     if(lightboxPhotoIds) lightboxPhotoIds.forEach((id) => { if(id) protect.add(id); });
   } catch(e){}
-  return { active, protect };
+  let svc = new Set();
+  try{ svc = svcOfflineIds(); svcOfflineProtectIds().forEach((id) => protect.add(id)); } catch(e){} // фото Автосервиса: свой лимит 50 МБ, не вытесняются общим проходом
+  return { active, protect, svc };
 }
 // Сохраняет локальную копию фото (Blob). Повторно не пишет. Ошибка записи не ломает ни заявку, ни загрузку в Firebase.
 async function offlinePhotoStore(uid, photoId, blob){
@@ -3979,6 +4016,7 @@ function offlinePhotoRemove(photoId){
 }
 // Смена/выход из аккаунта: object URL прежнего аккаунта освобождаем (сами файлы в IndexedDB остаются).
 function offlineReset(){
+  try{ svcOfflineResetState(); } catch(e){}
   offlinePhotoUrls.forEach((u) => { try{ URL.revokeObjectURL(u); } catch(e){} });
   offlinePhotoUrls.clear();
   offlineKeySet.clear();
@@ -4075,6 +4113,7 @@ function offlineScheduleRefresh(){
 // Картинки уже на экране — заменяем заглушки/ссылки на локальные копии (не сбрасывая масштаб в lightbox).
 function offlineRefreshViews(){
   try{ renderContent(); } catch(e){}
+  try{ svcOfflineRefreshMedia(); } catch(e){} // открытые панели Автосервиса / «Мой автомобиль»
   try{ if(editingNote) renderEditorPhotos(); } catch(e){}
   try{
     const lb = document.getElementById('lightbox');
@@ -4204,15 +4243,17 @@ function offlineScheduleEnforce(){
 }
 function offlineEnforceLimit(){
   if(!offlineUid) return;
+  try{ svcOfflineSweep(); } catch(e){}   // копии удалённых фото Автосервиса
+  try{ svcOfflineEnforce(); } catch(e){} // собственный лимит копий Автосервиса (50 МБ)
   let total = 0;
   offlineMeta.forEach((m) => { total += m.size || 0; });
   if(total <= OFFLINE_LIMIT_BYTES){ offlineOverLimit = false; offlineStatusUpdate(); return; }
   let baselineOk = false;
   try{ baselineOk = initialCloudBaselineReady === true; } catch(e){}
   if(baselineOk){
-    const { active, protect } = offlineClassify();
+    const { active, protect, svc } = offlineClassify();
     const cand = [];
-    offlineMeta.forEach((m, id) => { if(!active.has(id) && !protect.has(id)) cand.push([id, m]); });
+    offlineMeta.forEach((m, id) => { if(!active.has(id) && !protect.has(id) && !(svc && svc.has(id))) cand.push([id, m]); });
     cand.sort((a, b) => (a[1].lastAccessed || a[1].updatedAt || 0) - (b[1].lastAccessed || b[1].updatedAt || 0));
     const target = OFFLINE_LIMIT_BYTES * 0.9;
     for(const [id, m] of cand){
@@ -5917,18 +5958,11 @@ async function uploadPdf(id){
   pdfPendingUpload.add(id);
   const uid = currentUID;
   const path = 'users/' + uid + '/photos/' + id + '.pdf';
-  const ui = { stage: 'upload-local', source: 'local', via: '' }; // для журнала диагностики
-  const tUp = Date.now();
   try{
     const blob = await pdfDbGet(uid, id);
-    if(!blob){ // локальной копии нет — загружать нечего
-      if(!pdfDiagSkipSeen.has(id)){ pdfDiagSkipSeen.add(id); pdfDiagLog('pdf.upload.skip', { id }, Object.assign(ui, { local: 'miss' })); } // один раз за сеанс, чтобы не засорять журнал повторами
-      return;
-    }
-    ui.bytes = blob.size;
+    if(!blob) return; // локальной копии нет — загружать нечего
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let url;
-    ui.stage = 'upload-sdk'; ui.via = 'sdk';
     try{
       const task = storage.ref(path).put(bytes, { contentType: 'application/pdf' });
       url = await new Promise((resolve, reject) => {
@@ -5936,18 +5970,13 @@ async function uploadPdf(id){
         task.then(snap => { clearTimeout(timer); return snap.ref.getDownloadURL(); }).then(resolve, (e) => { clearTimeout(timer); reject(e); });
       });
     }catch(e1){
-      ui.sdkErr = e1; ui.stage = 'upload-rest'; ui.via = 'sdk→rest';
       url = await uploadBytesViaRest(path, bytes, 'application/pdf');
     }
-    ui.ms = Date.now() - tUp; ui.stage = 'apply-url';
-    pdfDiagLog('pdf.upload.ok', { id }, ui);
     applyUploadedPdfUrl(id, uid, path, url);
   }catch(err){
     console.warn('PDF не загрузился в облако (осталось локально):', err);
     const tries = (pdfUploadTries.get(id) || 0) + 1;
     pdfUploadTries.set(id, tries);
-    ui.ms = Date.now() - tUp;
-    pdfDiagLog('pdf.upload.fail', { id }, ui, err, { tries, retryInMin: Math.round(pdfBackoffMs(tries) / 60000) });
     pdfScheduleRetry(id, uid, tries); // без предела числа попыток, но с нарастающей паузой (плюс события: запуск, сеть, вход)
   } finally {
     pdfPendingUpload.delete(id);
@@ -5997,184 +6026,17 @@ function retryPendingPdfUploads(){
   serviceCarNotes.forEach(e => (e && e.files || []).forEach(go)); // файлы «Мой автомобиль»
 }
 
-// ---- журнал диагностики PDF (только ЗАПИСЬ событий в существующий журнал DIAG) ----
-// Не пишем: содержимое файлов, названия файлов, полные ссылки (в них токен доступа), заголовки Authorization и токены входа.
-// Любая ошибка внутри журнала гасится и на открытие/загрузку PDF не влияет.
-const PDF_MSG_GENERIC = 'Не удалось загрузить PDF. Проверьте интернет и повторите попытку';
-function pdfDiagClean(x){
-  return String(x == null ? '' : x)
-    .replace(/https?:\/\/[^\s"'<>)]+/gi, '[ссылка]')
-    .replace(/\b(token|access_token|id_token|key|sig|signature|auth)=[^&\s"']+/gi, '$1=…')
-    .replace(/\b(Bearer|Firebase)\s+[A-Za-z0-9._~+\/=-]{16,}/g, '$1 …')
-    .replace(/\s+/g, ' ').trim().slice(0, 200);
-}
-function pdfDiagHost(u){ try{ return new URL(String(u)).hostname.slice(0, 60); }catch(_){ return ''; } }
-// Где лежит файл: заявка (id, номер), черновик заявки, «Мой автомобиль» или неизвестно.
-function pdfDiagWhere(fileId){
-  const out = { where: 'unknown', id: '', num: '', role: 'document' };
-  try{
-    if(!fileId) return out;
-    const hit = (list) => (list || []).find(f => f && f.id === fileId);
-    for(const n of notes){
-      const f = n && hit(n.pdfFiles);
-      if(f){ out.where = 'note'; out.id = String(n.id); out.num = n.number == null ? '' : n.number; if(f.kind === 'receipt') out.role = 'receipt'; return out; }
-    }
-    if(typeof editingNote !== 'undefined' && editingNote){
-      const f = hit(editingNote.pdfFiles);
-      if(f){ out.where = 'note-draft'; out.id = String(editingNote.id); out.num = editingNote.number == null ? '' : editingNote.number; if(f.kind === 'receipt') out.role = 'receipt'; return out; }
-    }
-    for(const e of serviceCarNotes){
-      const f = e && hit(e.files);
-      if(f){ out.where = 'car'; out.id = String(e.id); return out; }
-    }
-  }catch(_){}
-  return out;
-}
-// Определяет вид ошибки. Если причина достоверно не известна — так и говорит (kind 'network'/'unknown'), без выдуманных выводов.
-function pdfDiagClassify(e, info){
-  info = info || {};
-  const stage = info.stage || '';
-  const msg = String(e && e.message != null ? e.message : (e || ''));
-  const nm = String(e && e.name || '');
-  const online = !(typeof navigator !== 'undefined' && navigator.onLine === false);
-  const res = { kind: 'unknown', code: '', cause: 'точная причина не определена', user: PDF_MSG_GENERIC, lv: 'error' };
-  const hm = /^(?:REST )?HTTP (\d{3})/.exec(msg);
-  const status = hm ? Number(hm[1]) : (Number(info.httpStatus) || 0);
-  if(e && e.code) res.code = pdfDiagClean(e.code).slice(0, 60);
-  else if(hm) res.code = 'HTTP ' + hm[1];
-  else if(nm && nm !== 'Error') res.code = nm.slice(0, 60);
-  // TypeError считаем сетевой ошибкой только на самом fetch (браузер так сообщает об обрыве); в других местах TypeError — это ошибка кода, а не сети
-  const isNet = /failed to fetch|networkerror|load failed|network request failed/i.test(msg) || (stage === 'cloud-fetch' && e instanceof TypeError);
-  const isUp = stage === 'upload-sdk' || stage === 'upload-rest';
-  const storageHost = /(^|\.)firebasestorage\.(googleapis\.com|app)$|^storage\.googleapis\.com$/.test(info.host || '');
-  if(stage === 'no-file'){
-    res.kind = 'no-file'; res.lv = 'warn';
-    res.cause = 'на этом телефоне нет копии файла, а ссылки на облако у файла ещё нет';
-    res.user = 'PDF пока недоступен: на этом телефоне нет его копии, а в облако он ещё не загружен';
-  } else if(stage === 'pdfjs-load'){
-    res.lv = 'warn';
-    if(!online){ res.kind = 'offline'; res.cause = 'нет интернета: просмотрщик PDF ещё не загружен'; res.user = 'Нет интернета: просмотрщик PDF ещё не загружен. Подключитесь к интернету и повторите попытку'; }
-    else { res.kind = 'viewer-lib'; res.cause = 'не загрузился просмотрщик PDF (pdf.js); причина не определена'; }
-  } else if(stage === 'cloud-fetch' || stage === 'cloud-body' || isUp){
-    if(status){
-      res.kind = (isUp || storageHost) ? 'storage' : 'http';
-      if(status === 401 || status === 403){ res.cause = 'доступ запрещён (HTTP ' + status + ')'; res.user = 'Нет доступа к PDF в облаке (HTTP ' + status + ')'; }
-      else if(status === 404){ res.cause = 'файл не найден в облаке (HTTP 404)'; res.user = 'PDF не найден в облаке (HTTP 404)'; }
-      else if(status === 408 || status === 429 || status >= 500){ res.cause = 'сервер хранилища ответил ошибкой (HTTP ' + status + ')'; res.user = 'Облако временно недоступно (HTTP ' + status + '). Повторите попытку позже'; }
-      else { res.cause = 'сервер хранилища ответил HTTP ' + status; }
-    } else if(/^storage\//.test(res.code)){
-      res.kind = 'storage';
-      const st = { 'storage/unauthorized': 'нет прав на файл (правила Storage или вход не подтверждён)', 'storage/unauthenticated': 'нет входа в аккаунт',
-        'storage/canceled': 'загрузка отменена', 'storage/retry-limit-exceeded': 'исчерпано время повторов (чаще всего нет связи)',
-        'storage/object-not-found': 'файл не найден в облаке', 'storage/quota-exceeded': 'квота хранилища исчерпана' };
-      res.cause = 'ошибка Firebase Storage: ' + (st[res.code] || res.code);
-    } else if(nm === 'AbortError' || /timeout/i.test(msg)){
-      res.kind = 'timeout'; res.lv = 'warn'; res.cause = 'нет ответа за отведённое время';
-    } else if(isNet){
-      res.lv = 'warn';
-      if(!online){ res.kind = 'offline'; res.cause = 'нет интернета (по данным телефона)'; res.user = 'Нет копии этого PDF без интернета'; }
-      else { res.kind = 'network'; res.cause = 'нет ответа от хранилища; причина не определена (возможно: нет связи, блокировка, CORS или тайм-аут)'; }
-    } else if(/^REST:/.test(msg)){
-      res.kind = 'storage'; res.cause = 'хранилище приняло файл, но не вернуло ссылку на него';
-    } else if(/^auth\//.test(res.code)){
-      res.kind = 'auth'; res.cause = 'вход в аккаунт не подтверждён';
-    }
-  } else if(stage === 'local-read'){
-    res.kind = 'local-db'; res.cause = 'не удалось прочитать копию PDF на телефоне'; res.user = 'Не удалось прочитать копию PDF на телефоне. Повторите попытку';
-  } else if(stage === 'upload-local'){
-    res.kind = 'local-db'; res.cause = 'не удалось прочитать копию PDF на телефоне перед отправкой';
-  } else if(stage === 'parse'){
-    res.kind = 'pdf-parse';
-    if(nm === 'PasswordException'){ res.cause = 'PDF защищён паролем'; res.user = 'PDF защищён паролем, открыть его нельзя'; }
-    else if(nm === 'InvalidPDFException'){ res.cause = 'файл не является корректным PDF (повреждён или не дочитан)'; res.user = 'Не удалось обработать PDF: файл повреждён или не читается'; }
-    else { res.cause = 'ошибка обработки PDF'; res.user = 'Не удалось обработать PDF. Повторите попытку'; }
-  } else if(stage === 'render'){
-    res.kind = 'pdf-render'; res.cause = 'ошибка отрисовки страницы'; res.user = 'Не удалось показать страницу';
-  } else if(stage === 'apply-url'){
-    res.kind = 'app'; res.cause = 'файл отправлен, но приложение не смогло записать ссылку в заявку';
-  }
-  return res;
-}
-const PDF_DIAG_LABEL = { 'pdf.open.ok': 'PDF открыт', 'pdf.open.fail': 'PDF не открылся', 'pdf.download.ok': 'PDF скачан из облака', 'pdf.download.fail': 'PDF не скачался из облака',
-  'pdf.upload.ok': 'PDF отправлен в облако', 'pdf.upload.fail': 'PDF не отправился в облако', 'pdf.upload.skip': 'PDF не отправлен: нет локальной копии', 'pdf.render.fail': 'Страница PDF не показалась' };
-// Одна запись в журнал: type (pdf.*.ok | .fail | .skip), entry ({id, kind}), info (этап, источник, размер…), err (для .fail), extra (доп. поля).
-// Возвращает разбор ошибки (для .fail), чтобы показать пользователю понятное сообщение.
-function pdfDiagLog(type, entry, info, err, extra){
-  let res = null;
-  diagSafe(() => {
-    info = info || {};
-    const failed = /\.fail$/.test(type);
-    const w = pdfDiagWhere(entry && entry.id);
-    const d = { file: entry && entry.id ? String(entry.id) : '', fileType: 'pdf', role: (entry && entry.kind === 'receipt') ? 'receipt' : w.role, where: w.where,
-      source: info.source || 'unknown', stage: info.stage || '', online: (typeof navigator !== 'undefined') ? navigator.onLine : null };
-    if(info.local) d.local = info.local;
-    if(info.via) d.via = info.via;
-    if(info.bytes != null) d.bytes = info.bytes;
-    if(info.pages != null) d.pages = info.pages;
-    if(info.page != null) d.page = info.page;
-    if(info.ms != null) d.ms = info.ms;
-    if(info.host) d.host = info.host;
-    if(info.httpStatus) d.http = info.httpStatus;
-    if(extra) Object.assign(d, extra);
-    let lv = type === 'pdf.upload.skip' ? 'warn' : 'info', msg = PDF_DIAG_LABEL[type] || type;
-    const srcRu = d.source === 'local' ? 'локальный кэш' : d.source === 'cloud' ? 'облако' : 'не определён';
-    // основной путь отправки (SDK) не сработал и сработал запасной (REST) — это тоже важно знать
-    if(info.sdkErr){ const sc = pdfDiagClassify(info.sdkErr, { stage: 'upload-sdk' }); d.sdk = { kind: sc.kind, code: sc.code, text: pdfDiagClean(info.sdkErr.message != null ? info.sdkErr.message : info.sdkErr) }; }
-    if(failed){
-      res = pdfDiagClassify(err, info);
-      d.kind = res.kind; d.code = res.code; d.text = pdfDiagClean(err && err.message != null ? err.message : err); d.cause = res.cause;
-      lv = res.lv;
-      msg += ' — ' + res.cause + (type === 'pdf.upload.fail' ? '' : ' · источник: ' + srcRu);
-    } else if(type === 'pdf.open.ok' || type === 'pdf.download.ok'){
-      msg += ' · источник: ' + srcRu;
-    } else if(type === 'pdf.upload.ok' && info.sdkErr){
-      msg += ' (основной способ не сработал, отправлено запасным — REST)'; lv = 'warn';
-    }
-    DIAG.log(type, lv, 'pdf', { id: w.id, num: w.num, msg, d, now: failed });
-  });
-  return res;
-}
-// Прикрепление PDF (заявка / «Мой автомобиль»): отказы пользователю и реальные сбои.
-function pdfDiagAttach(type, lv, msg, rec, d){
-  diagSafe(() => {
-    const dd = Object.assign({ fileType: 'pdf', online: (typeof navigator !== 'undefined') ? navigator.onLine : null }, d || {});
-    if(rec && 'id' in rec && rec.id == null) dd.newNote = true; // новая заявка: ID ей присвоится только при сохранении
-    DIAG.log(type, lv, 'pdf:attach', { id: rec && rec.id != null ? rec.id : '', num: rec && rec.number != null ? rec.number : '', msg, d: dd, now: lv !== 'info' });
-  });
-}
-const pdfDiagSkipSeen = new Set();
-
 // ---- получение байтов PDF (локально, иначе по ссылке) ----
-async function pdfGetBytes(entry, info){
-  info = info || {}; // сюда пишем, откуда и на каком этапе брали файл — для журнала диагностики
-  info.stage = 'local-db'; info.source = 'none'; info.local = 'no-owner';
+async function pdfGetBytes(entry){
   const uid = currentUID || pdfLocalOwnerUid(); // локальная копия читается и до подтверждения входа
   if(uid){
     const blob = await pdfDbGet(uid, entry.id);
-    info.local = blob ? 'hit' : 'miss';
-    if(blob){
-      info.source = 'local'; info.stage = 'local-read';
-      const u8 = new Uint8Array(await blob.arrayBuffer());
-      info.bytes = u8.length;
-      return u8;
-    }
+    if(blob) return new Uint8Array(await blob.arrayBuffer());
   }
-  if(!entry.url){ info.stage = 'no-file'; throw new Error('нет файла'); }
-  info.source = 'cloud'; info.stage = 'cloud-fetch'; info.host = pdfDiagHost(entry.url);
-  const t0 = Date.now();
-  let blob;
-  try{
-    const resp = await fetch(entry.url);
-    if(!resp.ok){ info.httpStatus = resp.status; throw new Error('HTTP ' + resp.status); }
-    info.stage = 'cloud-body';
-    blob = await resp.blob();
-  }catch(fe){
-    info.ms = Date.now() - t0;
-    pdfDiagLog('pdf.download.fail', entry, info, fe);
-    throw fe;
-  }
-  info.ms = Date.now() - t0; info.bytes = blob.size;
-  pdfDiagLog('pdf.download.ok', entry, info);
+  if(!entry.url) throw new Error('нет файла');
+  const resp = await fetch(entry.url);
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const blob = await resp.blob();
   if(uid) pdfDbPut(uid, entry.id, blob); // копия для просмотра без интернета
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -6196,18 +6058,18 @@ async function pdfRenderThumb(doc){
 async function addPdfFromFile(file, kind){
   if(!editingNote) return;
   const list = editingNote.pdfFiles = editingNote.pdfFiles || [];
-  if(list.length >= PDF_MAX_FILES){ pdfDiagAttach('pdf.attach.reject', 'info', 'PDF не добавлен: в заявке уже ' + PDF_MAX_FILES + ' файлов', editingNote, { reason: 'too-many', count: list.length }); showToast('Не больше ' + PDF_MAX_FILES + ' PDF в заявке'); return; }
-  if(file.size > PDF_MAX_BYTES){ pdfDiagAttach('pdf.attach.reject', 'info', 'PDF не добавлен: файл больше 25 МБ', editingNote, { reason: 'too-big', bytes: file.size }); showToast('PDF больше 25 МБ — слишком большой'); return; }
+  if(list.length >= PDF_MAX_FILES){ showToast('Не больше ' + PDF_MAX_FILES + ' PDF в заявке'); return; }
+  if(file.size > PDF_MAX_BYTES){ showToast('PDF больше 25 МБ — слишком большой'); return; }
   // Firebase Auth без сети подтверждает вход долго — currentUID ещё null. Владельца локальной копии берём из владельца
   // локального кэша заявок (CACHE_OWNER_KEY). Это только локальная привязка файла: в облако он уйдёт лишь когда Firebase
   // реально подтвердит ТОГО ЖЕ пользователя (uploadPdf требует currentUID, а копия лежит под ключом uid:id).
   const ownerUid = pdfLocalOwnerUid();
-  if(!ownerUid){ pdfDiagAttach('pdf.attach.fail', 'warn', 'PDF не добавлен: вход в аккаунт ещё не подтверждался на этом телефоне', editingNote, { reason: 'no-owner' }); showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
+  if(!ownerUid){ showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
   showToast('Обрабатываю PDF…', 2500);
   let buf;
-  try{ buf = await file.arrayBuffer(); }catch(e){ pdfDiagAttach('pdf.attach.fail', 'warn', 'PDF не добавлен: файл не удалось прочитать', editingNote, { reason: 'read-fail', code: pdfDiagClean(e && (e.code || e.name)), text: pdfDiagClean(e && e.message) }); showToast('Не удалось прочитать файл'); return; }
+  try{ buf = await file.arrayBuffer(); }catch(e){ showToast('Не удалось прочитать файл'); return; }
   const head = String.fromCharCode.apply(null, Array.from(new Uint8Array(buf, 0, Math.min(5, buf.byteLength))));
-  if(head !== '%PDF-'){ pdfDiagAttach('pdf.attach.reject', 'info', 'Файл не добавлен: это не PDF (нет заголовка %PDF-)', editingNote, { reason: 'not-pdf', bytes: buf.byteLength }); showToast('Это не PDF-файл'); return; }
+  if(head !== '%PDF-'){ showToast('Это не PDF-файл'); return; }
   const id = 'pdf_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   let thumb = null, pages = null, noPreview = false;
   try{
@@ -6216,20 +6078,15 @@ async function addPdfFromFile(file, kind){
     pages = doc.numPages;
     thumb = await pdfRenderThumb(doc);
     try{ doc.destroy(); }catch(e){}
-  }catch(e){
-    noPreview = true; console.warn('PDF: превью не получилось', e);
-    pdfDiagAttach('pdf.attach.preview-fail', 'warn', 'PDF добавляется без превью: ошибка обработки PDF или не загрузился pdf.js', editingNote, { reason: 'preview', online: navigator.onLine, code: pdfDiagClean(e && (e.code || e.name)), text: pdfDiagClean(e && e.message) });
-  }
+  }catch(e){ noPreview = true; console.warn('PDF: превью не получилось', e); }
   if(!editingNote) return; // редактор закрыли, пока обрабатывали
   const uid = pdfLocalOwnerUid();
-  if(!uid){ pdfDiagAttach('pdf.attach.fail', 'warn', 'PDF не добавлен: вход в аккаунт пропал во время обработки', editingNote, { reason: 'no-owner' }); showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
-  const savedLocal = await pdfDbPut(uid, id, new Blob([buf], { type: 'application/pdf' }));
-  if(savedLocal === null) pdfDiagAttach('pdf.attach.local-fail', 'warn', 'PDF добавлен, но копия на телефоне не сохранилась (хранилище браузера)', editingNote, { reason: 'local-save', file: id });
+  if(!uid){ showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
+  await pdfDbPut(uid, id, new Blob([buf], { type: 'application/pdf' }));
   editingNote.pdfFiles = editingNote.pdfFiles || [];
   const entry = { id, name: String(file.name || 'document.pdf').slice(0, 120), size: file.size, pages, url: null, thumb };
   if(kind === 'receipt') entry.kind = 'receipt'; // платёжный документ (ключ добавляем только когда он есть — Firestore не принимает undefined)
   editingNote.pdfFiles.push(entry);
-  pdfDiagAttach('pdf.attach.ok', 'info', 'PDF добавлен в заявку' + (kind === 'receipt' ? ' (платёжка)' : ''), editingNote, { file: id, role: kind === 'receipt' ? 'receipt' : 'document', bytes: file.size, pages, preview: !noPreview, localCopy: savedLocal !== null });
   renderEditorPhotos();
   pushHistory();
   if(noPreview) showToast('PDF добавлен, превью недоступно (нужен интернет для загрузки pdf.js)', 4000);
@@ -6490,10 +6347,7 @@ async function pdfVRenderPage(num){
     if(token === pdfV.token) pdfV.renderTask = null;
   }catch(e){
     if(e && e.name === 'RenderingCancelledException') return;
-    if(token === pdfV.token){
-      pdfDiagLog('pdf.render.fail', pdfV.entries[pdfV.idx], Object.assign({}, pdfV.info, { stage: 'render', page: num }), e);
-      pdfVSetMsg('Не удалось показать страницу');
-    }
+    if(token === pdfV.token) pdfVSetMsg('Не удалось показать страницу');
   }
 }
 async function openPdfViewer(entries, startId){
@@ -6507,25 +6361,18 @@ async function openPdfViewer(entries, startId){
   pdfVUpdateCount();
   pdfVSetMsg('Загрузка PDF…');
   const myToken = ++pdfV.token;
-  const info = { stage: 'pdfjs-load', source: 'unknown' }; // для журнала диагностики
-  const t0 = Date.now();
-  pdfV.info = info;
   try{
     const lib = await loadPdfJs();
-    const bytes = await pdfGetBytes(entry, info);
+    const bytes = await pdfGetBytes(entry);
     if(myToken !== pdfV.token) return;
-    info.stage = 'parse';
     const doc = await lib.getDocument({ data: bytes }).promise;
     if(myToken !== pdfV.token){ try{ doc.destroy(); }catch(e){} return; }
     pdfV.doc = doc;
-    info.pages = doc.numPages; info.ms = Date.now() - t0; info.stage = 'opened';
-    pdfDiagLog('pdf.open.ok', entry, info);
     await pdfVRenderPage(1);
   }catch(e){
-    info.ms = Date.now() - t0;
-    const r = pdfDiagLog('pdf.open.fail', entry, info, e); // записываем всегда, даже если просмотр уже закрыли
     if(myToken !== pdfV.token) return;
-    pdfVSetMsg((r && r.user) || PDF_MSG_GENERIC);
+    const offline = !navigator.onLine;
+    pdfVSetMsg(offline ? 'Нет копии этого PDF без интернета' : 'Не удалось открыть PDF' + (e && e.message ? ': ' + e.message : ''));
   }
 }
 function closePdfViewer(){
@@ -9355,6 +9202,11 @@ function showToast(msg, duration, action){
 let expenses = [];           // { id, category, amount, createdAt }
 let expenseIdSeq = 1;
 let expenseCategories = [];  // список категорий, которые пользователь сам вписал
+// Учёт дизельного топлива (этап 1). Литры заправки — необязательное поле liters в самом расходе
+// (уходит в облако вместе с расходом). Остатки — служебное поле fuelBalances:
+// { 'ГГГГ-М': { s: остаток на начало (только вручную, null если нет), e: остаток на конец (null если нет), et: время правки } }.
+// Начало месяца берётся из конца предыдущего автоматически; s используется, только если конца предыдущего нет.
+let fuelBalances = {};
 let expView = 'history';     // 'history' | 'groups'
 let viewedExpMonthOffset = 0;
 let editingExpenseId = null;
@@ -9439,8 +9291,6 @@ function incGruzov(n){ return incPlural(n, 'груз', 'груза', 'грузо
 
 // Тип расчёта заявки — ровно один: сначала Нал, затем Без НДС, иначе НДС.
 function incCategoryOf(n){ return n.cash === true ? 'cash' : n.noNds === true ? 'nonds' : 'nds'; }
-// Подпись типа расчёта на карточках грузов (только отображение; берётся из сохранённых полей cash / noNds)
-function payTypeLabel(n){ const c = incCategoryOf(n); return c === 'cash' ? 'Нал' : c === 'nonds' ? 'Без НДС' : 'НДС'; }
 // Те же правила, что в computeIncomeMonth: заявки без суммы в деньги не входят, частичные — по paidAmount.
 function incCalc(arr){
   let total = 0, paid = 0;
@@ -9627,6 +9477,9 @@ function renderIncome(){
       : status === 'partial'
       ? `${formatAmount(n.paidAmount || 0)} из ${formatAmount(n.amount)}`
       : formatAmount(n.amount);
+    // вид расчёта — по тем же правилам, что в карточках «Доставляется»: «без НДС» и/или «нал», иначе «с НДС» (если указана сумма)
+    const payKind = (n.noNds || n.cash) ? [n.noNds ? 'без НДС' : '', n.cash ? 'нал' : ''].filter(Boolean).join(' · ')
+      : (n.amount && incCategoryOf(n) === 'nds' ? 'с НДС' : '');
     return `
       <div class="inc-card" data-incopen="${n.id}">
         <div class="inc-main">
@@ -9636,8 +9489,8 @@ function renderIncome(){
         </div>
         <div class="inc-right">
           <span class="inc-amount">${amountLine}</span>
-          ${n.amount ? `<span class="inc-type">${payTypeLabel(n)}</span>` : ''}
           <span class="inc-status ${status}">${statusLabel}</span>
+          ${payKind ? `<span class="inc-pay">${payKind}</span>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -9711,6 +9564,178 @@ function computeExpenseMonth(offset){
   return { list, total, key };
 }
 
+// ---- Топливо: литры и остатки по месяцам ----
+const FUEL_MAX_L = 5000;   // выше этого значения литры/остаток считаем опечаткой (невозможное значение)
+function isFuelCategory(cat){
+  // Дизельная заправка: в названии есть «дизель/топливо/солярка/ДТ/заправка» и нет слов, которые делают категорию
+  // другой статьёй («Топливный фильтр», «Заправка кондиционера», присадки, насос, AdBlue и т.п.).
+  const words = String(cat == null ? '' : cat).toLowerCase().replace(/ё/g, 'е').split(/[^а-яa-z0-9]+/).filter(Boolean);
+  if(!words.length) return false;
+  const has = (list) => words.some(w => list.some(x => w.startsWith(x)));
+  const fuelWord = words.some(w => w === 'дт' || w === 'диз') || has(['дизел', 'дизтопл', 'топлив', 'соляр', 'заправк']);
+  if(!fuelWord) return false;
+  return !has(['фильтр', 'кондиц', 'кондей', 'присадк', 'насос', 'датчик', 'форсунк', 'ремонт', 'замен', 'мойк', 'масл',
+    'антифриз', 'омыва', 'adblue', 'блю', 'мочевин', 'систем', 'бачок', 'трубк', 'шланг']);
+}
+// Литры расхода: число > 0 или null (пусто / мусор из облака — НЕ ноль)
+function expLiters(e){
+  const v = e ? e.liters : null;
+  return (typeof v === 'number' && isFinite(v) && v > 0 && v <= FUEL_MAX_L) ? v : null;
+}
+// Заправка — по устойчивому признаку fuel:true (ставится при сохранении с полем литров и не зависит от liters),
+// по наличию поля liters (в т.ч. некорректного) или по названию категории (старые расходы).
+function expIsFuel(e){ return !!e && (e.fuel === true || (e.liters != null) || isFuelCategory(e.category)); }
+function fuelRound(n){ return Math.round(n * 100) / 100; }
+function fuelFmt(n){ return Number(fuelRound(n)).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' л'; }
+function fuelInputStr(n){ return n == null ? '' : String(fuelRound(n)).replace('.', ','); }
+// Разбор ввода литров/остатка. Возвращает { ok, value }: пусто -> ok, value null; мусор/отрицательное/слишком много -> ok:false.
+function fuelParse(str, allowZero){
+  const t = String(str == null ? '' : str).replace(/\s+/g, '').replace(/,/g, '.');
+  if(t === '') return { ok: true, value: null };
+  if(!/^\d+(\.\d{1,2})?$/.test(t)) return { ok: false, value: null };
+  const v = parseFloat(t);
+  if(!isFinite(v) || v > FUEL_MAX_L || v < 0 || (v === 0 && !allowZero)) return { ok: false, value: null };
+  return { ok: true, value: v };
+}
+function fuelNum(v){ return (typeof v === 'number' && isFinite(v) && v >= 0 && v <= FUEL_MAX_L) ? v : null; }
+function fuelSanitizeMap(m){
+  const out = {};
+  if(!m || typeof m !== 'object' || Array.isArray(m)) return out;
+  Object.keys(m).forEach(k => {
+    if(!/^\d{4}-\d{1,2}$/.test(k)) return;
+    const x = m[k];
+    if(!x || typeof x !== 'object') return;
+    out[k] = { s: fuelNum(x.s), e: fuelNum(x.e), et: (typeof x.et === 'number' && isFinite(x.et)) ? x.et : 0 };
+  });
+  return out;
+}
+// Канонический вид (ключи по порядку) — чтобы сравнение JSON не видело «изменений» там, где их нет.
+function fuelCanon(m){
+  const o = {};
+  Object.keys(m).sort().forEach(k => { o[k] = { s: m[k].s, e: m[k].e, et: m[k].et }; });
+  return o;
+}
+// Слияние пришедших из облака остатков с локальными: по каждому месяцу побеждает запись с большим et.
+// Возвращает { changed, localAhead } — localAhead: у нас есть более новые правки, которые надо отправить.
+function fuelMergeIncoming(inc){
+  const cloud = fuelSanitizeMap(inc);
+  let changed = false, localAhead = false;
+  Object.keys(cloud).forEach(k => {
+    const loc = fuelBalances[k];
+    if(!loc || cloud[k].et > loc.et){ fuelBalances[k] = cloud[k]; changed = true; }
+    else if(loc.et > cloud[k].et) localAhead = true;
+    else if(loc.s !== cloud[k].s || loc.e !== cloud[k].e) localAhead = true; // одинаковое et, разные значения — оставляем локальное и досылаем
+  });
+  Object.keys(fuelBalances).forEach(k => { if(!(k in cloud)) localAhead = true; });
+  return { changed, localAhead, cloud };
+}
+// Замена остатков целиком (импорт файла / восстановление копии): значения копии становятся «свежей правкой»,
+// месяцы, которых в копии нет, гасятся (null) — иначе облачная версия вернула бы их обратно.
+function fuelReplaceAll(src, prev){
+  const now = Date.now();
+  const nm = fuelSanitizeMap(src);
+  Object.keys(nm).forEach(k => { nm[k].et = now; });
+  Object.keys(prev || {}).forEach(k => { if(!(k in nm)) nm[k] = { s: null, e: null, et: now }; });
+  fuelBalances = nm;
+}
+function fuelPrevKey(key){ return monthKeyShift(key, -1); }
+function fuelNextKey(key){ return monthKeyShift(key, 1); }
+// Все расчёты месяца. Ничего не пишет.
+function fuelMonthData(key){
+  let fuelled = 0, known = 0, missing = 0;
+  expenses.forEach(e => {
+    const d = new Date(e.createdAt);
+    if((d.getFullYear() + '-' + (d.getMonth() + 1)) !== key) return;
+    if(!expIsFuel(e)) return;
+    const l = expLiters(e);
+    if(l == null) missing++; else { fuelled += l; known++; }
+  });
+  fuelled = fuelRound(fuelled);
+  const prev = fuelBalances[fuelPrevKey(key)];
+  const own = fuelBalances[key];
+  const prevEnd = prev ? fuelNum(prev.e) : null;
+  const ownStart = own ? fuelNum(own.s) : null;
+  const start = prevEnd != null ? prevEnd : ownStart;
+  const startFromPrev = prevEnd != null;
+  const end = own ? fuelNum(own.e) : null;
+  let status = 'ok', consumed = null;
+  if(missing > 0) status = 'missing';
+  else if(start == null || end == null) status = 'insufficient';
+  else {
+    consumed = fuelRound(start + fuelled - end);
+    if(consumed < 0){ status = 'impossible'; consumed = null; }
+  }
+  return { fuelled, known, missing, start, startFromPrev, end, consumed, status };
+}
+// Запись остатка месяца. field: 's' | 'e'. value: число >= 0 или null (очистить).
+function fuelSetBalance(key, field, value){
+  const old = fuelBalances[key] || { s: null, e: null, et: 0 };
+  const ent = { s: old.s, e: old.e, et: Date.now() };
+  ent[field] = value;
+  fuelBalances[key] = ent;
+  let note = '';
+  // Конец месяца становится началом следующего: вручную введённое начало следующего месяца больше не нужно
+  // (иначе остались бы два разных значения для одной границы).
+  if(field === 'e'){
+    const nk = fuelNextKey(key);
+    const nx = fuelBalances[nk];
+    if(nx && nx.s != null && value != null){
+      if(Math.abs(nx.s - value) > 0.005) note = 'Начало месяца «' + monthNameOf(nk).toLowerCase() + '» теперь ' + fuelFmt(value) + ' (было введено вручную ' + fuelFmt(nx.s) + ')';
+      fuelBalances[nk] = { s: null, e: nx.e, et: Date.now() };
+    }
+  }
+  saveState();
+  return note;
+}
+function renderFuelBlock(){
+  const box = document.getElementById('expFuelBlock');
+  if(!box) return;
+  const ae = document.activeElement;
+  if(ae && ae.classList && ae.classList.contains('fuel-in') && box.contains(ae)) return; // человек набирает число — не сбиваем ввод
+  const { key } = computeExpenseMonth(viewedExpMonthOffset);
+  const show = expenseCategories.some(isFuelCategory) || expenses.some(e => e.fuel === true || e.liters != null) || Object.keys(fuelBalances).length > 0;
+  if(!show){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const d = fuelMonthData(key);
+  const prevName = monthNameOf(fuelPrevKey(key)).toLowerCase();
+  const startRow = d.startFromPrev
+    ? `<div class="fuel-row"><span class="fuel-lbl">Остаток на начало<span class="fuel-sub">= конец месяца «${prevName}» (меняется там)</span></span><span class="fuel-val" id="fuelStartVal">${fuelFmt(d.start)}</span></div>`
+    : `<div class="fuel-row"><span class="fuel-lbl">Остаток на начало</span><span class="fuel-in-wrap"><input class="fuel-in" id="fuelStartIn" data-fuel="s" inputmode="decimal" placeholder="—" value="${fuelInputStr(d.start)}"><span>л</span></span></div>`;
+  const fuelledSub = d.missing > 0 ? `<span class="fuel-sub">${d.missing} ${d.missing === 1 ? 'заправка' : 'заправок'} без литров — в сумму не входит</span>` : '';
+  let cons;
+  if(d.status === 'ok') cons = `<span class="fuel-val" id="fuelConsumedVal">${fuelFmt(d.consumed)}</span>`;
+  else if(d.status === 'missing') cons = `<span class="fuel-val warn" id="fuelConsumedVal">Недостаточно данных: у ${d.missing} ${d.missing === 1 ? 'заправки' : 'заправок'} не указаны литры</span>`;
+  else if(d.status === 'impossible') cons = `<span class="fuel-val bad" id="fuelConsumedVal">Ошибка: остаток на конец больше, чем начало + заправлено</span>`;
+  else cons = `<span class="fuel-val warn" id="fuelConsumedVal">Недостаточно данных</span>`;
+  box.innerHTML = `
+    <div class="fuel-block-title">Топливо за месяц</div>
+    ${startRow}
+    <div class="fuel-row"><span class="fuel-lbl">Заправлено${fuelledSub}</span><span class="fuel-val" id="fuelFuelledVal">${fuelFmt(d.fuelled)}</span></div>
+    <div class="fuel-row"><span class="fuel-lbl">Остаток на конец</span><span class="fuel-in-wrap"><input class="fuel-in" id="fuelEndIn" data-fuel="e" inputmode="decimal" placeholder="—" value="${fuelInputStr(d.end)}"><span>л</span></span></div>
+    <div class="fuel-row fuel-total"><span class="fuel-lbl">Израсходовано</span>${cons}</div>`;
+  box.style.display = 'block';
+}
+document.getElementById('expFuelBlock').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && e.target.classList && e.target.classList.contains('fuel-in')){ e.preventDefault(); e.target.blur(); }
+});
+document.getElementById('expFuelBlock').addEventListener('change', (e) => {
+  const inp = e.target;
+  if(!inp || !inp.classList || !inp.classList.contains('fuel-in')) return;
+  const field = inp.getAttribute('data-fuel');
+  const { key } = computeExpenseMonth(viewedExpMonthOffset);
+  const r = fuelParse(inp.value, true);
+  if(!r.ok){
+    showToast('Введите число литров от 0 до ' + FUEL_MAX_L);
+    inp.blur(); renderFuelBlock(); return;
+  }
+  const cur = fuelBalances[key];
+  const curVal = cur ? fuelNum(cur[field]) : null;
+  if(curVal === r.value){ inp.blur(); renderFuelBlock(); return; }
+  const note = fuelSetBalance(key, field, r.value);
+  inp.blur();
+  renderFuelBlock();
+  if(note) showToast(note);
+});
+
 function renderExpSummaryBar(){
   const bar = document.getElementById('expSummaryBar');
   const { list, total, key } = computeExpenseMonth(viewedExpMonthOffset);
@@ -9740,6 +9765,7 @@ document.getElementById('expViewToggle').addEventListener('click', (e) => {
 
 function renderExpenses(){
   renderExpSummaryBar();
+  renderFuelBlock();
   document.querySelectorAll('.exp-view-btn').forEach(b => {
     b.classList.toggle('active', b.getAttribute('data-expview') === expView);
   });
@@ -9763,6 +9789,7 @@ function renderExpHistoryList(){
         <span class="exp-cat">${escapeHtml(e.category)}</span>
         <span class="exp-amount">${formatAmount(e.amount)}</span>
         <span class="exp-meta">${formatNoteDate(e.createdAt)}</span>
+        ${expLiters(e) != null ? `<span class="exp-liters">${fuelFmt(expLiters(e))}</span>` : (expIsFuel(e) ? `<span class="exp-liters none">литры не указаны</span>` : '')}
       </div>
       <button class="exp-edit" data-expedit="${e.id}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -9812,6 +9839,10 @@ const expSheetOverlay = document.getElementById('expSheetOverlay');
 const expCatRow = document.getElementById('expCatRow');
 const expCatNewInput = document.getElementById('expCatNewInput');
 const expAmountInput = document.getElementById('expAmountInput');
+const expLitersInput = document.getElementById('expLitersInput');
+let expLitersManual = false;   // человек сам включил поле литров для категории с другим названием
+let expNotFuel = false;        // человек нажал «Это не заправка»: при сохранении убрать признак fuel и литры
+let expFuelFlag = false;       // у редактируемого расхода уже есть признак заправки (fuel:true или любое liters)
 
 function renderExpCatRow(){
   const chips = expenseCategories.map(cat => `
@@ -9833,6 +9864,7 @@ expCatRow.addEventListener('click', (e) => {
     expSelectedCategory = chip.getAttribute('data-expcat');
     renderExpCatRow();
     updateExpSaveBtnState();
+    updateExpLitersUI();
   }
 });
 expCatNewInput.addEventListener('keydown', (e) => {
@@ -9848,18 +9880,59 @@ function commitNewCategory(){
   }
   renderExpCatRow();
   updateExpSaveBtnState();
+  updateExpLitersUI();
   expAmountInput.focus();
 }
 expCatNewInput.addEventListener('blur', () => {
   if(expCatNewInput.style.display !== 'none') commitNewCategory();
 });
 
+function expLitersVisible(){
+  if(expNotFuel && !isFuelCategory(expSelectedCategory)) return false;
+  return isFuelCategory(expSelectedCategory) || expLitersManual || expFuelFlag || expLitersInput.value.trim() !== '';
+}
+function updateExpLitersUI(){
+  if(isFuelCategory(expSelectedCategory)) expNotFuel = false;   // категория сама определяет заправку — «не заправка» неприменимо
+  const vis = expLitersVisible();
+  const nfBtn = document.getElementById('expNotFuelBtn');
+  const canNotFuel = expFuelFlag && !isFuelCategory(expSelectedCategory);
+  nfBtn.style.display = canNotFuel ? 'inline-block' : 'none';
+  nfBtn.textContent = expNotFuel ? 'Вернуть: это заправка' : 'Это не заправка (убрать признак и литры)';
+  document.getElementById('expLitersRow').style.display = vis ? 'flex' : 'none';
+  document.getElementById('expLitersAddBtn').style.display = (!vis && !expNotFuel && expSelectedCategory) ? 'inline-block' : 'none';
+  const hint = document.getElementById('expLitersHint');
+  const r = fuelParse(expLitersInput.value, false);
+  if(vis && !r.ok){
+    hint.textContent = 'Литры: число больше 0 и не больше ' + FUEL_MAX_L + ' (можно дробное, например 350,5)';
+    hint.className = 'exp-liters-hint err'; hint.style.display = 'block';
+  } else if(vis && r.value == null){
+    hint.textContent = 'Без литров заправка не попадёт в расчёт расхода за месяц';
+    hint.className = 'exp-liters-hint'; hint.style.display = 'block';
+  } else { hint.style.display = 'none'; }
+}
 function updateExpSaveBtnState(){
   const amount = parseExactAmount(expAmountInput.value);
-  const ok = expSelectedCategory && amount > 0;
+  const litersOk = !expLitersVisible() || fuelParse(expLitersInput.value, false).ok;
+  const ok = expSelectedCategory && amount > 0 && litersOk;
   document.getElementById('expSaveBtn').disabled = !ok;
 }
 expAmountInput.addEventListener('input', updateExpSaveBtnState);
+expLitersInput.addEventListener('input', () => { updateExpLitersUI(); updateExpSaveBtnState(); });
+expLitersInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); expLitersInput.blur(); }
+});
+document.getElementById('expNotFuelBtn').addEventListener('click', () => {
+  expNotFuel = !expNotFuel;
+  // Введённые литры НЕ стираем: это только режим формы, реально убирается при сохранении — до этого «Вернуть» всё восстанавливает.
+  updateExpLitersUI();
+  updateExpSaveBtnState();
+});
+document.getElementById('expLitersAddBtn').addEventListener('click', () => {
+  expLitersManual = true;
+  updateExpLitersUI();
+  updateExpSaveBtnState();
+  expLitersInput.focus();
+});
 expAmountInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter'){ e.preventDefault(); expAmountInput.blur(); }
 });
@@ -9872,6 +9945,11 @@ function openExpenseSheet(id){
   expCatNewInput.style.display = 'none';
   renderExpCatRow();
   expAmountInput.value = entry ? String(entry.amount).replace('.', ',') : '';
+  expLitersManual = false;
+  expNotFuel = false;
+  expFuelFlag = !!entry && (entry.fuel === true || entry.liters != null);
+  expLitersInput.value = entry && expLiters(entry) != null ? fuelInputStr(expLiters(entry)) : '';
+  updateExpLitersUI();
   document.getElementById('expSaveBtn').textContent = entry ? 'Сохранить' : 'Добавить';
   document.getElementById('expDeleteBtn').style.display = entry ? 'block' : 'none';
   updateExpSaveBtnState();
@@ -9888,12 +9966,24 @@ expSheetOverlay.addEventListener('click', (e) => {
 document.getElementById('expSaveBtn').addEventListener('click', () => {
   const amount = parseExactAmount(expAmountInput.value);
   if(!expSelectedCategory || !(amount > 0)) return;
+  // Литры: поле видно -> разбираем; невидимое поле (обычный расход) литры не трогает вообще.
+  const litersShown = expLitersVisible();
+  const lr = litersShown ? fuelParse(expLitersInput.value, false) : { ok: true, value: null };
+  if(!lr.ok) return;
   if(editingExpenseId != null){
     const entry = expenses.find(x => x.id === editingExpenseId);
-    if(entry){ entry.category = expSelectedCategory; entry.amount = amount; entry.editedAt = Date.now(); }
+    if(entry){
+      entry.category = expSelectedCategory; entry.amount = amount; entry.editedAt = Date.now();
+      if(lr.value != null) entry.liters = lr.value; else delete entry.liters;   // явное удаление, независимо от видимости поля
+      if(litersShown) entry.fuel = true;
+      else if(expNotFuel) delete entry.fuel;   // явная отмена признака заправки
+    }
     showToast('Расход изменён');
   } else {
-    expenses.push({ id: expenseIdSeq++ + '_' + Math.random().toString(36).slice(2, 8), category: expSelectedCategory, amount, createdAt: Date.now(), editedAt: Date.now() });
+    const ne = { id: expenseIdSeq++ + '_' + Math.random().toString(36).slice(2, 8), category: expSelectedCategory, amount, createdAt: Date.now(), editedAt: Date.now() };
+    if(lr.value != null) ne.liters = lr.value;
+    if(litersShown) ne.fuel = true;
+    expenses.push(ne);
     showToast('Расход добавлен');
   }
   saveState();
@@ -10225,6 +10315,7 @@ function svcMoveItems(srcId, dst, itemIds){
 function svcSave(){
   saveState();
   svcScheduleFlush();
+  try{ svcOfflineScheduleSweep(); }catch(e){} // копии удалённых фото уберём, когда всё сохранится
 }
 function svcSaveSoon(){
   clearTimeout(svcSaveTimer);
@@ -10650,6 +10741,7 @@ function svcOpenFolder(id, flashItemId){
   document.getElementById('searchInput').value = '';
   renderService();
   document.getElementById('main').scrollTop = 0;
+  try{ svcOfflineWarmFolder(svcOpenFolderId); }catch(e){} // докачка копий фото только этой папки
   if(svcFlashItemId){
     const el = Array.from(document.querySelectorAll('#svcGroups [data-svc-item]'))
       .find(x => x.getAttribute('data-svc-item') === svcFlashItemId);
@@ -11176,6 +11268,10 @@ function svcApplyUploadedUrl(photoId, uid, gen, path, url){
     return;
   }
   if(found.p.url) return;
+  if(found.p.local && !(offlineUid === uid && offlineKeySet.has(String(photoId)))){
+    // копия по какой-то причине не записалась раньше — пробуем ещё раз, пока base64 не удалён
+    try{ svcOfflineStore(uid, photoId, dataURItoBlob(found.p.local), 'after-upload'); }catch(e){}
+  }
   found.p.url = url;
   delete found.p.local;
   svcPhotoError.delete(photoId);
@@ -11203,6 +11299,7 @@ async function svcUploadPhoto(photoId){
     const blob = dataURItoBlob(found.p.local);
     type = blob.type || 'image/jpeg';
     bytes = new Uint8Array(await blob.arrayBuffer());
+    await svcOfflineStore(uid, photoId, blob, 'add'); // локальная копия ДО отправки в Storage и после загрузки не удаляется
   } catch(e){
     svcPhotoPending.delete(photoId);
     svcPhotoError.set(photoId, 'не удалось подготовить файл');
@@ -11238,6 +11335,317 @@ function svcRetryPendingUploads(){
   }));
 }
 
+// ---- Офлайн-копии фото Автосервиса и «Моего автомобиля» ----
+// Копии лежат в той же локальной базе IndexedDB, что и фото заявок (vreyseOffline, ключ «uid:photoId»), и поднимаются теми же
+// функциями offline*. В Firestore, Storage и резервные копии ничего не добавляется. Свой лимит — 50 МБ (в рамках общих 300 МБ).
+// Новое фото копируется при добавлении (до отправки в облако) и после загрузки НЕ удаляется. Старые фото докачиваются только
+// при открытии конкретной папки или «Моего автомобиля», при интернете, в 1–2 потока. Удаляются лишь локальные копии.
+const SVC_OFFLINE_LIMIT_BYTES = 50 * 1024 * 1024;
+const SVC_OFFLINE_ROOM_BYTES = 2 * 1024 * 1024;   // запас под одно фото при докачке
+const SVC_WARM_LANES = 2;
+const SVC_WARM_MAX_PER_RUN = 60;
+const SVC_WARM_RETRY_MS = 10 * 60 * 1000;
+const svcOfflineFailed = new Map();   // photoId -> { at, reason } — не скачалось, повторяем не чаще, чем раз в 10 минут
+const svcOfflineQueue = [];           // [{ id, url }] — ждут скачивания
+const svcOfflineQueued = new Set();
+const svcOfflineShown = new Set();    // «photoId|источник|ok» — каждое сочетание пишем в журнал один раз за запуск
+const svcOfflineStats = { ok: 0, fail: 0, bytes: 0 };
+let svcOfflineLanes = 0;
+let svcOfflineOverWarned = false;
+let svcOfflineRefreshTimer = null;
+function svcOfflineLog(type, lv, id, msg, d){
+  diagSafe(() => DIAG.log(type, lv, 'photo:service', { id: id || undefined, msg, d }));
+}
+function svcOfflineEachPhoto(fn){
+  try{ serviceFolders.forEach(f => (f.items || []).forEach(it => (it.photos || []).forEach(p => { if(p && p.id != null) fn(p, 'service'); }))); }catch(e){}
+  try{ serviceCarNotes.forEach(en => (en.photos || []).forEach(p => { if(p && p.id != null) fn(p, 'car'); })); }catch(e){}
+}
+function svcOfflineIds(){
+  const out = new Set();
+  svcOfflineEachPhoto(p => out.add(String(p.id)));
+  return out;
+}
+// Фото, чьи копии нельзя удалять: ещё не загруженные в облако (единственная копия — base64) и открытые сейчас.
+function svcOfflineProtectIds(){
+  const out = new Set();
+  svcOfflineEachPhoto(p => { if(!p.url) out.add(String(p.id)); });
+  try{ if(svcDetail){ const tg = svcDetailTarget(); if(tg) (tg.it.photos || []).forEach(p => out.add(String(p.id))); } }catch(e){}
+  try{ if(carDetail){ const en = carTarget(); if(en) (en.photos || []).forEach(p => out.add(String(p.id))); } }catch(e){}
+  // сейчас на экране: открытая папка, список «Мой автомобиль», фото в просмотре
+  try{
+    if(currentSection === 'service'){
+      if(carOpen) serviceCarNotes.forEach(en => (en.photos || []).forEach(p => out.add(String(p.id))));
+      else if(svcOpenFolderId != null){ const f = svcFolderById(svcOpenFolderId); if(f) (f.items || []).forEach(it => (it.photos || []).forEach(p => out.add(String(p.id)))); }
+    }
+  }catch(e){}
+  try{ if(lightboxPhotoIds) lightboxPhotoIds.forEach(id => { if(id) out.add(String(id)); }); }catch(e){}
+  return out;
+}
+function svcOfflineBytes(){
+  let t = 0;
+  svcOfflineIds().forEach(id => { const m = offlineMeta.get(id); if(m) t += m.size || 0; });
+  return t;
+}
+// Что показывать в <img>: локальная копия; нет копии — ссылка Storage; ещё не загружено — base64.
+function svcPhotoSrc(p){
+  if(!p) return '';
+  if(!p.url) return p.local || '';
+  if(!offlineUid) return p.url;
+  const s = photoSrcById(p.url, String(p.id));
+  return s === NO_COPY_PHOTO_PLACEHOLDER ? p.url : s; // нет копии и нет сети: пробуем ссылку (вдруг осталась в кэше браузера); при ошибке — заглушка (см. svcOfflineImgEvent)
+}
+function svcOfflineRefreshMedia(){
+  try{ if(svcDetail) svcDetailRefreshMedia(); }catch(e){}
+  try{ if(carDetail) carDetailRefreshMedia(); }catch(e){}
+}
+function svcOfflineScheduleRefresh(){
+  clearTimeout(svcOfflineRefreshTimer);
+  svcOfflineRefreshTimer = setTimeout(svcOfflineRefreshMedia, 150);
+}
+// Сохраняет копию фото; ошибка записи не мешает ни показу, ни загрузке в облако.
+async function svcOfflineStore(uid, photoId, blob, why){
+  if(!uid || !photoId || !blob) return false;
+  const t0 = Date.now();
+  let ok = false;
+  try{ ok = await offlineWithTimeout(offlinePhotoStore(uid, String(photoId), blob), 8000, false, 'копия фото Автосервиса не записалась вовремя'); }catch(e){ ok = false; }
+  svcOfflineLog(ok ? 'photo.copy.write' : 'photo.copy.fail', ok ? 'info' : 'warn', photoId,
+    ok ? 'Локальная копия фото Автосервиса сохранена' : 'Не удалось сохранить локальную копию фото Автосервиса',
+    { why, size: blob.size || 0, ms: Date.now() - t0 });
+  if(ok){ svcOfflineKnownAdd(uid, photoId); svcOfflineScheduleRefresh(); }
+  return ok;
+}
+function svcOfflineTouch(id){
+  try{
+    const m = offlineMeta.get(id);
+    const now = Date.now();
+    if(m && now - (m.lastAccessed || 0) > 10 * 60 * 1000){ m.lastAccessed = now; offlineIdbTouch(offlineUid, id, now); }
+  }catch(e){}
+}
+// Докачка: только переданные фото, только при интернете. Файлы из облака уже лежат в Storage — тут копируется лишь локальная копия.
+function svcOfflineWarm(photos, why, attempt, ctx){
+  if(!offlineUid) return;
+  ctx = ctx || { uid: offlineUid, gen: authGeneration }; // очередь привязана к аккаунту и поколению входа
+  if(ctx.uid !== offlineUid || ctx.gen !== authGeneration) return;
+  svcOfflineScheduleSweep();
+  if(!offlineHydrated){ if((attempt || 0) < 8) setTimeout(() => svcOfflineWarm(photos, why, (attempt || 0) + 1, ctx), 800); return; }
+  const online = navigator.onLine !== false;
+  let added = 0, have = 0, skipped = 0;
+  for(const p of photos){
+    if(!p || p.id == null) continue;
+    const id = String(p.id);
+    if(offlineKeySet.has(id)){ have++; svcOfflineTouch(id); continue; }
+    if(!online || typeof p.url !== 'string' || !/^https?:/i.test(p.url)){ skipped++; continue; }
+    const fl = svcOfflineFailed.get(id);
+    if(fl && fl.uid === ctx.uid && Date.now() - fl.at < SVC_WARM_RETRY_MS){ skipped++; continue; }
+    if(svcOfflineQueued.has(id) || offlineFetching.has(id)) continue;
+    if(added >= SVC_WARM_MAX_PER_RUN){ skipped++; continue; }
+    svcOfflineQueued.add(id); svcOfflineQueue.push({ id, url: p.url, uid: ctx.uid, gen: ctx.gen }); added++;
+  }
+  if(added || (!online && skipped)){
+    svcOfflineLog('photo.warm.start', 'info', '', online ? 'Докачка фото Автосервиса: ' + added + ' шт.' : 'Докачка фото Автосервиса отложена: нет интернета',
+      { why, queued: added, haveCopy: have, skipped, online });
+  }
+  svcOfflinePump();
+}
+function svcOfflinePump(){
+  while(svcOfflineLanes < SVC_WARM_LANES && svcOfflineQueue.length){
+    svcOfflineLanes++;
+    (async () => {
+      try{
+        while(svcOfflineQueue.length){
+          const it = svcOfflineQueue.shift();
+          const uid = it.uid;
+          try{
+            // задача чужого аккаунта / прежнего входа — выбрасываем, ничего не качаем и не сохраняем
+            if(uid !== offlineUid || it.gen !== authGeneration || uid !== currentUID) continue;
+            if(navigator.onLine === false || offlineKeySet.has(it.id)) continue;
+            if(!svcOfflineMakeRoom()){
+              svcOfflineLog('photo.warm.limit', 'warn', '', 'Докачка остановлена: лимит 50 МБ занят защищёнными копиями (ожидающие отправки или открытые)', { bytes: svcOfflineBytes() });
+              svcOfflineQueue.forEach(q => svcOfflineQueued.delete(q.id)); svcOfflineQueue.length = 0;
+              continue;
+            }
+            offlineFetching.add(it.id);
+            const t0 = Date.now();
+            try{
+              const blob = await offlineFetchBlob(it.url);
+              if(uid !== offlineUid || it.gen !== authGeneration || uid !== currentUID){
+                svcOfflineLog('photo.warm.cancel', 'info', it.id, 'Скачанное фото не сохранено: за это время сменился аккаунт', {});
+                continue;
+              }
+              const ok = await svcOfflineStore(uid, it.id, blob, 'warm');
+              if(ok){ svcOfflineStats.ok++; svcOfflineStats.bytes += blob.size || 0; svcOfflineFailed.delete(it.id); }
+              else { svcOfflineStats.fail++; svcOfflineFailed.set(it.id, { at: Date.now(), reason: 'не записалось', uid }); }
+            } catch(e){
+              if(uid !== offlineUid || it.gen !== authGeneration) continue; // ошибка задачи старого аккаунта новому не относится
+              const reason = offlineFailText(e);
+              svcOfflineStats.fail++;
+              svcOfflineFailed.set(it.id, { at: Date.now(), reason, uid });
+              svcOfflineLog('photo.fetch.fail', 'warn', it.id, 'Не удалось скачать фото Автосервиса для офлайна: ' + reason, { reason, ms: Date.now() - t0, online: navigator.onLine !== false });
+            }
+          } finally {
+            offlineFetching.delete(it.id);
+            svcOfflineQueued.delete(it.id);
+          }
+        }
+      } finally {
+        svcOfflineLanes--;
+        if(!svcOfflineLanes && !svcOfflineQueue.length && (svcOfflineStats.ok || svcOfflineStats.fail)){
+          svcOfflineLog('photo.warm.done', svcOfflineStats.fail ? 'warn' : 'info', '', 'Докачка фото Автосервиса завершена: скачано ' + svcOfflineStats.ok + ', ошибок ' + svcOfflineStats.fail,
+            { ok: svcOfflineStats.ok, fail: svcOfflineStats.fail, bytes: svcOfflineStats.bytes, ownBytes: svcOfflineBytes() });
+          svcOfflineStats.ok = 0; svcOfflineStats.fail = 0; svcOfflineStats.bytes = 0;
+          offlineScheduleEnforce();
+        }
+      }
+    })();
+  }
+}
+function svcOfflineWarmFolder(fid){
+  const f = svcFolderById(fid);
+  if(!f) return;
+  const list = [];
+  (f.items || []).forEach(it => (it.photos || []).forEach(p => list.push(p)));
+  svcOfflineWarm(list, 'folder');
+}
+function svcOfflineWarmCar(){
+  const list = [];
+  serviceCarNotes.forEach(en => (en.photos || []).forEach(p => list.push(p)));
+  svcOfflineWarm(list, 'car');
+}
+function svcOfflineWarmCurrent(){
+  try{
+    if(currentSection !== 'service') return;
+    if(carOpen) svcOfflineWarmCar();
+    else if(svcOpenFolderId != null) svcOfflineWarmFolder(svcOpenFolderId);
+  }catch(e){}
+}
+// Лимит 50 МБ: удаляются только локальные копии фото Автосервиса (самые давно открытые первыми), кроме защищённых
+// (ожидающие отправки, открытая папка/панель/просмотр). Возвращает размер копий после чистки.
+function svcOfflineEvict(trigger, target, why){
+  if(!offlineUid) return 0;
+  const ids = svcOfflineIds();
+  let total = 0;
+  ids.forEach(id => { const m = offlineMeta.get(id); if(m) total += m.size || 0; });
+  if(total <= trigger) return total;
+  const protect = svcOfflineProtectIds();
+  const cand = [];
+  ids.forEach(id => { const m = offlineMeta.get(id); if(m && !protect.has(id)) cand.push([id, m]); });
+  cand.sort((a, b) => (a[1].lastAccessed || a[1].updatedAt || 0) - (b[1].lastAccessed || b[1].updatedAt || 0));
+  for(const [id, m] of cand){
+    if(total <= target) break;
+    total -= m.size || 0;
+    offlinePhotoRemove(id); // только локальная копия; в Storage ничего не удаляется
+    svcOfflineLog('photo.copy.evict', 'info', id, 'Локальная копия фото Автосервиса удалена: ' + why + ' (файл в облаке цел)', { size: m.size || 0, why });
+  }
+  return total;
+}
+function svcOfflineEnforce(){
+  const total = svcOfflineEvict(SVC_OFFLINE_LIMIT_BYTES, SVC_OFFLINE_LIMIT_BYTES * 0.9, 'лимит 50 МБ');
+  if(total <= SVC_OFFLINE_LIMIT_BYTES){ svcOfflineOverWarned = false; return; }
+  if(!svcOfflineOverWarned){
+    svcOfflineOverWarned = true;
+    svcOfflineLog('photo.copy.over-limit', 'warn', '', 'Копии фото Автосервиса больше 50 МБ, но все защищены (не загружены или открыты)', { bytes: total });
+  }
+}
+// Место под докачку: если копий уже почти на лимит, освобождаем за счёт самых старых незащищённых (других папок).
+function svcOfflineMakeRoom(){
+  const trigger = SVC_OFFLINE_LIMIT_BYTES - SVC_OFFLINE_ROOM_BYTES;
+  return svcOfflineEvict(trigger, SVC_OFFLINE_LIMIT_BYTES * 0.9, 'нужно место для папки, которую открыли') <= trigger;
+}
+// Уборка копий удалённых фото. Удаляются ТОЛЬКО локальные копии фото, которых больше нет ни в одной папке/записи
+// (известные нам «как фото Автосервиса» id хранятся отдельно по аккаунтам). Очередь удаления файлов из Storage (30 дней) не затрагивается.
+// Работает только когда списки полные: подтверждён первый снимок облака, тот же аккаунт.
+const SVC_KNOWN_KEY = 'vreyse_svcOfflineIds_';
+let svcOfflineKnown = new Set(), svcOfflineKnownUid = null, svcOfflineSweepTimer = null;
+function svcOfflineKnownLoad(uid){
+  if(svcOfflineKnownUid === uid) return;
+  svcOfflineKnownUid = uid; svcOfflineKnown = new Set();
+  try{ const a = JSON.parse(localStorage.getItem(SVC_KNOWN_KEY + uid) || '[]'); if(Array.isArray(a)) a.forEach(x => svcOfflineKnown.add(String(x))); }catch(e){}
+}
+function svcOfflineKnownSave(){
+  try{ if(svcOfflineKnownUid) localStorage.setItem(SVC_KNOWN_KEY + svcOfflineKnownUid, JSON.stringify(Array.from(svcOfflineKnown).slice(-3000))); }catch(e){}
+}
+function svcOfflineKnownAdd(uid, id){
+  try{ svcOfflineKnownLoad(uid); if(!svcOfflineKnown.has(String(id))){ svcOfflineKnown.add(String(id)); svcOfflineKnownSave(); } }catch(e){}
+}
+function svcOfflineScheduleSweep(){
+  clearTimeout(svcOfflineSweepTimer);
+  svcOfflineSweepTimer = setTimeout(svcOfflineSweep, 1500);
+}
+function svcOfflineSweep(){
+  try{
+    const uid = offlineUid;
+    if(!uid || uid !== currentUID || !offlineHydrated || !serviceBaselineReady || !carBaselineReady) return;
+    svcOfflineKnownLoad(uid);
+    const cur = svcOfflineIds();
+    let changed = false;
+    cur.forEach(id => { if(!svcOfflineKnown.has(id)){ svcOfflineKnown.add(id); changed = true; } });
+    const protect = svcOfflineProtectIds();
+    const cargo = new Set();
+    notes.forEach(n => (n && Array.isArray(n.photoIds) ? n.photoIds : []).forEach(id => cargo.add(String(id))));
+    let removed = 0, bytes = 0;
+    Array.from(svcOfflineKnown).forEach(id => {
+      if(cur.has(id)) return;
+      if(protect.has(id) || cargo.has(id) || svcOfflineQueued.has(id) || offlineFetching.has(id)) return;
+      if(offlineKeySet.has(id)){ const m = offlineMeta.get(id); bytes += (m && m.size) || 0; offlinePhotoRemove(id); removed++; }
+      svcOfflineKnown.delete(id); changed = true;
+    });
+    if(changed) svcOfflineKnownSave();
+    if(removed) svcOfflineLog('photo.copy.cleanup', 'info', '', 'Удалены локальные копии фото, которых больше нет в Автосервисе: ' + removed + ' шт. (в облаке ничего не удалялось)', { removed, bytes });
+  }catch(e){}
+}
+// Смена/выход из аккаунта: очередь, ошибки и реестр прежнего аккаунта не переносим.
+function svcOfflineResetState(){
+  svcOfflineQueue.length = 0;
+  svcOfflineQueued.clear();
+  svcOfflineFailed.clear();
+  svcOfflineShown.clear();
+  svcOfflineStats.ok = 0; svcOfflineStats.fail = 0; svcOfflineStats.bytes = 0;
+  svcOfflineKnown = new Set(); svcOfflineKnownUid = null;
+  svcOfflineOverWarned = false;
+  clearTimeout(svcOfflineSweepTimer);
+  clearTimeout(svcOfflineRefreshTimer);
+}
+// Диагностика показа: откуда на самом деле взята картинка — локальная копия, ссылка Storage или заглушка.
+function svcOfflineSrcKind(attr, ok){
+  if(!attr) return 'empty';
+  if(attr === NO_COPY_PHOTO_PLACEHOLDER) return 'placeholder-no-copy';
+  if(attr === PENDING_PHOTO_PLACEHOLDER) return 'placeholder-wait';
+  if(attr.indexOf('blob:') === 0) return 'local-copy';
+  if(attr.indexOf('data:image/svg') === 0) return 'placeholder';
+  if(attr.indexOf('data:') === 0) return 'pending-base64';
+  if(/^https?:/i.test(attr)) return (ok && navigator.onLine === false) ? 'storage-url-from-browser-cache' : 'storage-url';
+  return 'other';
+}
+function svcOfflineImgEvent(ev, ok){
+  try{
+    const el = ev.target;
+    if(!el || el.tagName !== 'IMG') return;
+    let id = el.getAttribute('data-det-photo');
+    if(!id && el.id === 'lbImg'){
+      const ids = lightboxPhotoIds;
+      id = ids && ids[lbIndex] != null ? String(ids[lbIndex]) : null;
+      if(!id || !svcOfflineIds().has(id)) return;
+    }
+    if(!id) return;
+    const attr = el.getAttribute('src') || '';
+    const kind = svcOfflineSrcKind(attr, ok);
+    if(!ok && kind === 'storage-url' && navigator.onLine === false && !el.getAttribute('data-nocopy')){
+      el.setAttribute('data-nocopy', '1');
+      el.src = NO_COPY_PHOTO_PLACEHOLDER; // нет сети и нет копии — понятная заглушка вместо сломанной картинки
+    }
+    const key = id + '|' + kind + '|' + (ok ? 1 : 0);
+    if(svcOfflineShown.has(key)) return;
+    if(svcOfflineShown.size > 600) svcOfflineShown.clear();
+    svcOfflineShown.add(key);
+    svcOfflineLog(ok ? 'photo.show' : 'photo.show.fail', ok ? 'info' : 'warn', id,
+      (ok ? 'Фото Автосервиса показано: ' : 'Фото Автосервиса не загрузилось: ') + kind,
+      { src: kind, online: navigator.onLine !== false, hasCopy: offlineKeySet.has(id), place: el.id === 'lbImg' ? 'viewer' : 'detail' });
+  }catch(e){}
+}
+document.addEventListener('load', (ev) => svcOfflineImgEvent(ev, true), true);
+document.addEventListener('error', (ev) => svcOfflineImgEvent(ev, false), true);
+window.addEventListener('online', () => { svcOfflineFailed.clear(); svcOfflineWarmCurrent(); });
+
 // ---- панель деталей пункта (по нажатию на текст пункта) ----
 const svcDetailOverlay = document.getElementById('svcDetailOverlay');
 const svcDetailEl = document.getElementById('svcDetail');
@@ -11254,7 +11662,7 @@ function svcPhotosHtml(it, withTitles){
   if(!ps.length) return '';
   return '<div class="svc-photos">' + ps.map(p => {
     const id = escapeHtml(p.id);
-    const src = p.url || p.local || '';
+    const src = svcPhotoSrc(p);
     const st = p.url ? '' : (svcPhotoError.has(p.id)
       ? `<div class="svc-ph-st err" title="${escapeHtml(svcPhotoError.get(p.id))}">ошибка загрузки</div>`
       : '<div class="svc-ph-st">загружается…</div>');
@@ -11860,6 +12268,7 @@ function carRefreshPendingStatus(){
 function carSave(){
   carPersistLocal(); // сначала отдельный ключ, потом общее состояние и облако
   saveState();
+  try{ svcOfflineScheduleSweep(); }catch(e){}
   carScheduleFlush();
   carRefreshPendingStatus();
 }
@@ -11924,6 +12333,7 @@ function carOpenList(){
   document.getElementById('searchInput').value = '';
   renderService();
   document.getElementById('main').scrollTop = 0;
+  try{ svcOfflineWarmCar(); }catch(e){} // докачка копий фото «Мой автомобиль»
 }
 function carCloseList(){
   carFlushLocalSave();
@@ -12056,6 +12466,7 @@ function carOpenDetail(id){
   svcOpenFolderId = null;
   renderService();
   carShowDetail(e);
+  try{ svcOfflineWarmCar(); }catch(e2){}
 }
 function carResetDetail(){
   carDetail = null;
@@ -12156,17 +12567,17 @@ async function carAddFileFromPicker(file){
   const t0 = carTarget();
   if(!t0 || !file) return;
   const eid = t0.id;
-  if((t0.files || []).length >= SVC_MAX_FILES){ pdfDiagAttach('pdf.attach.reject', 'info', 'Файл не добавлен: в записи «Мой автомобиль» уже ' + SVC_MAX_FILES + ' файлов', { id: eid }, { reason: 'too-many', where: 'car' }); showToast('Не больше ' + SVC_MAX_FILES + ' файлов в записи'); return; }
+  if((t0.files || []).length >= SVC_MAX_FILES){ showToast('Не больше ' + SVC_MAX_FILES + ' файлов в записи'); return; }
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
-  if(!isPdf){ pdfDiagAttach('pdf.attach.reject', 'info', 'Файл не добавлен: это не PDF («Мой автомобиль»)', { id: eid }, { reason: 'not-pdf', where: 'car' }); showToast('Пока можно прикреплять только PDF'); return; }
-  if(file.size > PDF_MAX_BYTES){ pdfDiagAttach('pdf.attach.reject', 'info', 'Файл не добавлен: больше 25 МБ («Мой автомобиль»)', { id: eid }, { reason: 'too-big', where: 'car', bytes: file.size }); showToast('Файл больше 25 МБ — слишком большой'); return; }
+  if(!isPdf){ showToast('Пока можно прикреплять только PDF'); return; }
+  if(file.size > PDF_MAX_BYTES){ showToast('Файл больше 25 МБ — слишком большой'); return; }
   // Владелец локальной копии — последний подтверждённый аккаунт этого телефона; в облако файл уйдёт только после подтверждения входа (uploadPdf).
   const owner = pdfLocalOwnerUid();
-  if(!owner){ pdfDiagAttach('pdf.attach.fail', 'warn', 'Файл не добавлен: вход в аккаунт ещё не подтверждался на этом телефоне («Мой автомобиль»)', { id: eid }, { reason: 'no-owner', where: 'car' }); showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
+  if(!owner){ showToast('Нужен вход в аккаунт. Подключитесь к интернету один раз.', 4000); return; }
   let buf;
-  try{ buf = await file.arrayBuffer(); }catch(err){ pdfDiagAttach('pdf.attach.fail', 'warn', 'Файл не добавлен: не удалось прочитать («Мой автомобиль»)', { id: eid }, { reason: 'read-fail', where: 'car', code: pdfDiagClean(err && (err.code || err.name)), text: pdfDiagClean(err && err.message) }); showToast('Не удалось прочитать файл'); return; }
+  try{ buf = await file.arrayBuffer(); }catch(err){ showToast('Не удалось прочитать файл'); return; }
   const head = String.fromCharCode.apply(null, Array.from(new Uint8Array(buf, 0, Math.min(5, buf.byteLength))));
-  if(head !== '%PDF-'){ pdfDiagAttach('pdf.attach.reject', 'info', 'Файл не добавлен: это не PDF, нет заголовка %PDF- («Мой автомобиль»)', { id: eid }, { reason: 'not-pdf', where: 'car', bytes: buf.byteLength }); showToast('Это не PDF-файл'); return; }
+  if(head !== '%PDF-'){ showToast('Это не PDF-файл'); return; }
   const title = await carAskFileTitle(carFileBaseName(file.name), 'Название документа');
   if(title === null) return; // «Отмена» — файл не добавляется
   let e = carEntryAny(eid);
@@ -12174,7 +12585,7 @@ async function carAddFileFromPicker(file){
   if((e.files || []).length >= SVC_MAX_FILES){ showToast('Не больше ' + SVC_MAX_FILES + ' файлов в записи'); return; }
   const id = 'carf_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   const saved = await pdfDbPut(owner, id, new Blob([buf], { type: 'application/pdf' }));
-  if(saved === null){ pdfDiagAttach('pdf.attach.fail', 'warn', 'Файл не добавлен: копия на телефоне не сохранилась («Мой автомобиль»)', { id: eid }, { reason: 'local-save', where: 'car', file: id }); showToast('Не удалось сохранить файл на телефоне'); return; }
+  if(saved === null){ showToast('Не удалось сохранить файл на телефоне'); return; }
   e = carEntryAny(eid);
   if(!e){ pdfDbDel(owner, id); return; }
   carEnsureCommitted(e);
@@ -12182,7 +12593,6 @@ async function carAddFileFromPicker(file){
   const entryF = { id, name: String(file.name || 'document.pdf').slice(0, 120), size: file.size, url: null, type: 'pdf' };
   if(title) entryF.title = title;
   e.files.push(entryF);
-  pdfDiagAttach('pdf.attach.ok', 'info', 'PDF добавлен в «Мой автомобиль»', { id: e.id }, { file: id, where: 'car', bytes: file.size });
   carTouch(e);
   carSave();
   carDetailRefreshMedia();
@@ -12584,7 +12994,7 @@ function toMillis(v){
 }
 // forCloud=true — для резервных копий в Firestore: у Автосервиса без временных base64-фото.
 function stateSnapshot(forCloud){
-  return { notes, idSeq, monthKey, monthlyGoal, expenses, expenseIdSeq, expenseCategories,
+  return { notes, idSeq, monthKey, monthlyGoal, expenses, expenseIdSeq, expenseCategories, fuelBalances,
     serviceFolders: forCloud ? serviceFolders.map(svcFolderForCloud) : serviceFolders,
     serviceCarNotes: forCloud ? serviceCarNotes.map(carEntryForCloud) : serviceCarNotes, updatedAt: localUpdatedAt };
 }
@@ -12604,6 +13014,9 @@ function applyState(s){
   expenses = s.expenses || [];
   expenseIdSeq = s.expenseIdSeq || 1;
   expenseCategories = s.expenseCategories || [];
+  // Остатки дизеля: объект — применяем; {} (сброс при входе/выходе) — очищаем; ключа нет (старая копия) — оставляем как есть.
+  if(s.fuelBalances && typeof s.fuelBalances === 'object' && !Array.isArray(s.fuelBalances)) fuelBalances = fuelSanitizeMap(s.fuelBalances);
+  else if(!Object.keys(s).length) fuelBalances = {};
   localUpdatedAt = toMillis(s.updatedAt);
   diagSafe(() => DIAG.diff('applyState'));
 }
@@ -12651,7 +13064,10 @@ function persistSyncedNotesMap(){
   try{ localStorage.setItem(SYNCED_NOTES_KEY, JSON.stringify(Array.from(lastSyncedNotes.entries()))); } catch(e){}
 }
 function metaSnapshotForSync(){
-  return { idSeq, expenseIdSeq, monthKey, monthlyGoal, expenseCategories };
+  const m = { idSeq, expenseIdSeq, monthKey, monthlyGoal, expenseCategories };
+  // Ключ добавляем только когда есть что хранить — у тех, кто учёт топлива не использует, документ не меняется.
+  if(Object.keys(fuelBalances).length) m.fuelBalances = fuelCanon(fuelBalances);
+  return m;
 }
 function saveState(){
   diagSafe(() => DIAG.diff('saveState'));
@@ -12793,6 +13209,23 @@ syncBadgeEl.addEventListener('click', () => {
     flushCloudSave();
   }
 });
+// Значок «нет интернета» (перечёркнутое облако в шапке между поиском и аватаркой). Показывает ТОЛЬКО то, что телефон
+// сообщает об отсутствии сети (navigator.onLine и события online/offline); к Firebase не обращается и состояние
+// синхронизации не читает и не меняет. Когда сеть вернулась, значок скрывается, но это ещё не значит, что сервер уже
+// подтвердил сохранение — подробности по-прежнему в разделе «Диагностика».
+const offlineIconEl = document.getElementById('offlineIcon');
+function updateOfflineIcon(){
+  try{
+    const off = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    offlineIconEl.style.display = off ? 'flex' : 'none';
+    document.documentElement.classList.toggle('net-off', off); // только скрывает обычный значок ожидания отправки (см. правило html.net-off #syncIcon); сам он и логика синхронизации не меняются
+  }catch(_){}
+}
+window.addEventListener('online', updateOfflineIcon);
+window.addEventListener('offline', updateOfflineIcon);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) updateOfflineIcon(); }); // события могли пропасть, пока приложение было свёрнуто
+offlineIconEl.addEventListener('click', () => { showToast('Нет интернета. Изменения могут ожидать отправки в облако'); });
+updateOfflineIcon();
 // Как только связь физически появилась — сразу пробуем отправить то, что не
 // дошло, не дожидаясь отдельного таймера повтора.
 window.addEventListener('online', () => {
@@ -13809,7 +14242,17 @@ function subscribeCloud(userRef, onBaselineReady, knownNoteIdsAtStart, writesAll
     // документе ('in'), а не его значение — тогда явное null/[] тоже применяется.
     if('monthlyGoal' in d) monthlyGoal = d.monthlyGoal;
     if('expenseCategories' in d) expenseCategories = d.expenseCategories || [];
+    let fuelAhead = false;
+    { const fm = fuelMergeIncoming(d.fuelBalances); fuelAhead = fm.localAhead; }  // поля в облаке может не быть вовсе — тогда локальные остатки тоже надо отправить
     lastSyncedMetaJSON = JSON.stringify(metaSnapshotForSync());
+    if(fuelAhead){
+      // У нас есть более новые остатки, чем в облаке: считаем облачным то, что там реально лежит, — тогда они уйдут.
+      const cm = metaSnapshotForSync();
+      const cl = fuelSanitizeMap(d.fuelBalances);
+      if(Object.keys(cl).length) cm.fuelBalances = fuelCanon(cl); else delete cm.fuelBalances;
+      lastSyncedMetaJSON = JSON.stringify(cm);
+      scheduleCloudSave();
+    }
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(stateSnapshot())); } catch(e){}
     renderContent();
   }, e => console.warn('Не удалось подписаться на служебные данные:', e)));
@@ -14744,7 +15187,9 @@ document.getElementById('backupsBtn')?.addEventListener('click', (e) => {
                 .then(() => Promise.resolve().then(() => {
                   diagSafe(() => DIAG.restorePlan(opId, restoreData && restoreData.notes));
                   diagSafe(() => DIAG.replaceIntent('backup.restore.cloud', 'restore', restoreData && restoreData.notes, { backup: String(preRestoreKey), opId }));
+                  const prevFuelBalances = fuelBalances;
                   applyState(restoreData);
+                  if(restoreData && restoreData.fuelBalances && typeof restoreData.fuelBalances === 'object' && !Array.isArray(restoreData.fuelBalances)) fuelReplaceAll(restoreData.fuelBalances, prevFuelBalances);
                   diagSafe(() => DIAG.restoreApplied(opId));
                   backupReconcileDeleteQueues();
                   expectRestored = { svc: backupExpectedFrom(serviceFolders), car: backupExpectedFrom(serviceCarNotes) };
@@ -15024,7 +15469,7 @@ document.getElementById('backupsCloseBtn')?.addEventListener('click', () => {
 // новой версии HTML-файла данные автоматически не переносятся. Эти кнопки
 // позволяют вручную сохранить всё в JSON-файл и загрузить его обратно.
 function exportData(){
-  const payload = { notes, idSeq, monthKey, monthlyGoal, expenses, expenseIdSeq, expenseCategories, serviceFolders, serviceCarNotes };
+  const payload = { notes, idSeq, monthKey, monthlyGoal, expenses, expenseIdSeq, expenseCategories, fuelBalances, serviceFolders, serviceCarNotes };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -15058,6 +15503,7 @@ function importDataFromFile(file){
           expenses = s.expenses || [];
           expenseIdSeq = s.expenseIdSeq || 1;
           expenseCategories = s.expenseCategories || [];
+          if(s.fuelBalances && typeof s.fuelBalances === 'object' && !Array.isArray(s.fuelBalances)) fuelReplaceAll(s.fuelBalances, fuelBalances);
           if(Array.isArray(s.serviceFolders)) serviceFolders = s.serviceFolders.map(svcSanitizeFolder).filter(Boolean);
           if(Array.isArray(s.serviceCarNotes)) serviceCarNotes = s.serviceCarNotes.map(carSanitizeEntry).filter(Boolean);
           carPersistLocal();
@@ -15301,7 +15747,17 @@ function refreshFromCloudOnResume(){
       // телефоне сюда не долетало.
       if('monthlyGoal' in d) monthlyGoal = d.monthlyGoal;
       if('expenseCategories' in d) expenseCategories = d.expenseCategories || [];
+      let fuelAhead2 = false;
+      { const fm2 = fuelMergeIncoming(d.fuelBalances); fuelAhead2 = fm2.localAhead; if(fm2.changed) touched = true; }
       lastSyncedMetaJSON = JSON.stringify(metaSnapshotForSync());
+      if(fuelAhead2){
+        const cm2 = metaSnapshotForSync();
+        const cl2 = fuelSanitizeMap(d.fuelBalances);
+        if(Object.keys(cl2).length) cm2.fuelBalances = fuelCanon(cl2); else delete cm2.fuelBalances;
+        lastSyncedMetaJSON = JSON.stringify(cm2);
+        touched = true;
+        scheduleCloudSave();
+      }
     }
     notesSnap.forEach(docSnap => {
       const id = docSnap.id;
