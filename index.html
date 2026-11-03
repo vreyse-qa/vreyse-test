@@ -616,6 +616,14 @@
     font-weight:700;font-family:'Inter',sans-serif;color:var(--ink);text-align:right;outline:none;background:transparent;}
   .fuel-in:focus{border-color:var(--accent);}
   .fuel-row.fuel-total{border-top:1px solid var(--card-line);margin-top:4px;padding-top:8px;}
+  .exp-date-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1.5px solid var(--card-line);
+    border-radius:14px;padding:8px 16px;margin-top:10px;}
+  .exp-date-row.bad{border-color:var(--danger);}
+  .exp-date-label{font-size:15px;font-weight:600;color:var(--muted);}
+  .exp-date-input{border:none;outline:none;font-size:16px;font-weight:700;font-family:'Inter',sans-serif;color:var(--ink);
+    background:transparent;text-align:right;min-width:0;}
+  .fuel-sync-line{font-size:12.5px;margin-top:8px;color:var(--faint);}
+  .fuel-sync-line.err{color:var(--danger);font-weight:600;cursor:pointer;}
   .exp-sheet-actions{display:flex;gap:10px;}
   .exp-delete-btn{flex:0 0 auto;background:var(--surface);border:1.5px solid #f28b82;color:#c5221f;
     border-radius:12px;padding:13px 18px;font-size:14.5px;font-weight:700;cursor:pointer;
@@ -1272,7 +1280,7 @@
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-02 15:38 (Топливо: отмена признака — настоящая отмена)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-03 09:04 (Топливо: отдельная отправка остатков, дата расхода)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -1560,6 +1568,7 @@
       <input class="exp-amount-input" id="expAmountInput" inputmode="decimal" placeholder="0">
       <span class="exp-amount-suffix">₽</span>
     </div>
+    <div class="exp-date-row" id="expDateRow"><span class="exp-date-label">Дата</span><input type="date" class="exp-date-input" id="expDateInput" min="2000-01-01"></div>
     <div class="exp-liters-row" id="expLitersRow" style="display:none;">
       <input class="exp-liters-input" id="expLitersInput" inputmode="decimal" placeholder="Количество литров">
       <span class="exp-amount-suffix">л</span>
@@ -9207,6 +9216,9 @@ let expenseCategories = [];  // список категорий, которые 
 // { 'ГГГГ-М': { s: остаток на начало (только вручную, null если нет), e: остаток на конец (null если нет), et: время правки } }.
 // Начало месяца берётся из конца предыдущего автоматически; s используется, только если конца предыдущего нет.
 let fuelBalances = {};
+let lastSyncedFuelJSON = null;   // что, как мы знаем, лежит в облаке (канонический JSON) — для сравнения «есть ли что отправлять»
+let fuelFlushInFlight = null, fuelFlushAgain = false, fuelRetryTimer = null;
+let fuelSyncError = '';          // код последней ошибки отправки остатков ('' — нет ошибки)
 let expView = 'history';     // 'history' | 'groups'
 let viewedExpMonthOffset = 0;
 let editingExpenseId = null;
@@ -9552,14 +9564,27 @@ document.getElementById('incList').addEventListener('click', (e) => {
   if(n) openEditor(n);
 });
 
+// ---- Дата расхода ----
+// Расход может иметь необязательное поле date = 'ГГГГ-ММ-ДД' (выбранный день). У старых расходов его нет —
+// тогда днём расхода считается день создания (createdAt), то есть всё работает как раньше.
+function expPad(n){ return String(n).padStart(2, '0'); }
+function expDateStr(ts){ const d = new Date(ts); return d.getFullYear() + '-' + expPad(d.getMonth() + 1) + '-' + expPad(d.getDate()); }
+function expTodayStr(){ return expDateStr(Date.now()); }
+function expDateValid(str){
+  if(typeof str !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const [y, m, d] = str.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  return y >= 2000 && t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d;
+}
+function expDay(e){ return expDateValid(e && e.date) ? e.date : expDateStr(e && e.createdAt); }
+function expMonthKeyOf(e){ const p = expDay(e).split('-').map(Number); return p[0] + '-' + p[1]; }
+function expDayTs(e){ const p = expDay(e).split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], 12).getTime(); }
+
 function computeExpenseMonth(offset){
   const now = new Date();
   const nowKey = now.getFullYear() + '-' + (now.getMonth() + 1);
   const key = offset ? monthKeyShift(nowKey, offset) : nowKey;
-  const list = expenses.filter(e => {
-    const d = new Date(e.createdAt);
-    return (d.getFullYear() + '-' + (d.getMonth() + 1)) === key;
-  });
+  const list = expenses.filter(e => expMonthKeyOf(e) === key);
   const total = list.reduce((s, e) => s + (e.amount || 0), 0);
   return { list, total, key };
 }
@@ -9598,6 +9623,10 @@ function fuelParse(str, allowZero){
   return { ok: true, value: v };
 }
 function fuelNum(v){ return (typeof v === 'number' && isFinite(v) && v >= 0 && v <= FUEL_MAX_L) ? v : null; }
+// Запись месяца: { s, e, ts, te, et }. s/e — остаток на начало/конец; ts/te — время правки начала и конца ОТДЕЛЬНО
+// (поэтому правка начала на одном телефоне и конца на другом не затирают друг друга); et = max(ts, te) — прежнее поле
+// формата (его понимают и старые версии, и записи без ts/te, созданные ими, читаются как «обе половины правились в et»).
+function fuelTime(v){ return (typeof v === 'number' && isFinite(v) && v >= 0) ? v : 0; }
 function fuelSanitizeMap(m){
   const out = {};
   if(!m || typeof m !== 'object' || Array.isArray(m)) return out;
@@ -9605,37 +9634,124 @@ function fuelSanitizeMap(m){
     if(!/^\d{4}-\d{1,2}$/.test(k)) return;
     const x = m[k];
     if(!x || typeof x !== 'object') return;
-    out[k] = { s: fuelNum(x.s), e: fuelNum(x.e), et: (typeof x.et === 'number' && isFinite(x.et)) ? x.et : 0 };
+    const et = fuelTime(x.et);
+    let ts = fuelTime(x.ts), te = fuelTime(x.te);
+    if(et > Math.max(ts, te)){ ts = et; te = et; }   // запись старого формата или правка старой версией
+    out[k] = { s: fuelNum(x.s), e: fuelNum(x.e), ts, te, et: Math.max(ts, te) };
   });
   return out;
 }
-// Канонический вид (ключи по порядку) — чтобы сравнение JSON не видело «изменений» там, где их нет.
+// Канонический вид (ключи и поля по порядку) — чтобы сравнение JSON не видело «изменений» там, где их нет.
 function fuelCanon(m){
   const o = {};
-  Object.keys(m).sort().forEach(k => { o[k] = { s: m[k].s, e: m[k].e, et: m[k].et }; });
+  Object.keys(m).sort().forEach(k => { o[k] = { s: m[k].s, e: m[k].e, ts: m[k].ts, te: m[k].te, et: m[k].et }; });
   return o;
 }
-// Слияние пришедших из облака остатков с локальными: по каждому месяцу побеждает запись с большим et.
-// Возвращает { changed, localAhead } — localAhead: у нас есть более новые правки, которые надо отправить.
-function fuelMergeIncoming(inc){
-  const cloud = fuelSanitizeMap(inc);
-  let changed = false, localAhead = false;
-  Object.keys(cloud).forEach(k => {
-    const loc = fuelBalances[k];
-    if(!loc || cloud[k].et > loc.et){ fuelBalances[k] = cloud[k]; changed = true; }
-    else if(loc.et > cloud[k].et) localAhead = true;
-    else if(loc.s !== cloud[k].s || loc.e !== cloud[k].e) localAhead = true; // одинаковое et, разные значения — оставляем локальное и досылаем
-  });
-  Object.keys(fuelBalances).forEach(k => { if(!(k in cloud)) localAhead = true; });
-  return { changed, localAhead, cloud };
+function fuelJSON(m){ return JSON.stringify(fuelCanon(fuelSanitizeMap(m))); }
+// Выбор значения одного поля: новее время — побеждает; при равном времени и разных значениях — детерминированно
+// большее (null — наименьшее), чтобы два устройства пришли к одному результату, а не менялись значениями по кругу.
+function fuelPick(av, at, bv, bt){
+  if(at !== bt) return at > bt ? [av, at] : [bv, bt];
+  if(av === bv) return [av, at];
+  if(av == null) return [bv, bt];
+  if(bv == null) return [av, at];
+  return av > bv ? [av, at] : [bv, bt];
 }
+// Слияние двух (уже очищенных) карт по месяцам и по полям. Чистая функция.
+function fuelMergeMaps(a, b){
+  const out = {};
+  new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
+    const x = a[k], y = b[k];
+    if(!x){ out[k] = Object.assign({}, y); return; }
+    if(!y){ out[k] = Object.assign({}, x); return; }
+    const s = fuelPick(x.s, x.ts, y.s, y.ts), e = fuelPick(x.e, x.te, y.e, y.te);
+    out[k] = { s: s[0], e: e[0], ts: s[1], te: e[1], et: Math.max(s[1], e[1]) };
+  });
+  return out;
+}
+// ЕДИНСТВЕННОЕ место, где остатки из облака сливаются с локальными (живая подписка, возврат в приложение, итог
+// отправки). Запоминает, что сейчас в облаке; если у нас есть то, чего там нет или что новее, ставит отправку в очередь.
+// Возвращает true, если локальные остатки изменились (надо сохранить и перерисовать).
+function fuelApplyCloud(raw){
+  const cloud = fuelSanitizeMap(raw);
+  const before = fuelJSON(fuelBalances);
+  fuelBalances = fuelMergeMaps(fuelSanitizeMap(fuelBalances), cloud);
+  lastSyncedFuelJSON = JSON.stringify(fuelCanon(cloud));
+  const nowJ = fuelJSON(fuelBalances);
+  if(nowJ !== lastSyncedFuelJSON) fuelScheduleFlush();
+  return nowJ !== before;
+}
+function fuelDirty(){
+  if(lastSyncedFuelJSON == null) return Object.keys(fuelBalances).length > 0;
+  return fuelJSON(fuelBalances) !== lastSyncedFuelJSON;
+}
+function fuelScheduleFlush(){ try{ scheduleCloudSave(); }catch(e){} }   // дальше flushCloudSave() сам вызовет flushFuelBalances()
+function fuelSetError(code){
+  fuelSyncError = code || '';
+  try{ if(typeof currentSection !== 'undefined' && currentSection === 'fuel') renderFuelBlock(); }catch(e){}
+}
+// Отправка остатков — ОТДЕЛЬНАЯ цепочка (как у Автосервиса): отказ или сбой здесь не блокирует заявки и расходы.
+// Транзакция читает облачное значение, сливает по полям (fuelMergeMaps) и пишет только если что-то реально отличается,
+// поэтому устаревшая локальная копия не может затереть более новую правку с другого телефона. Пишется то же поле
+// users/{uid}.fuelBalances (формат прежний). Нет связи — транзакция не выполняется, данные остаются на телефоне и
+// отправляются позже (по событию online, при возврате в приложение или любой следующей отправке).
+function flushFuelBalances(){
+  if(!currentUID || suppressCloudSave || !initialCloudBaselineReady || !cloudWritesAllowedThisSession) return Promise.resolve();
+  if(!fuelDirty()){ if(fuelSyncError) fuelSetError(''); return Promise.resolve(); }
+  if(navigator.onLine === false) return Promise.resolve();   // связи нет: данные остаются на телефоне, уйдут по событию online
+  if(fuelFlushInFlight){ fuelFlushAgain = true; return fuelFlushInFlight; }
+  if(fuelRetryTimer){ clearTimeout(fuelRetryTimer); fuelRetryTimer = null; }
+  const uid = currentUID, gen = authGeneration;
+  const userRef = db.collection('users').doc(uid);
+  const mine = fuelSanitizeMap(fuelBalances);   // снимок на момент отправки
+  let wrote = false;
+  const run = db.runTransaction(tx => tx.get(userRef).then(snap => {
+    wrote = false;
+    const cloud = fuelSanitizeMap(snap.exists ? (snap.data() || {}).fuelBalances : null);
+    const merged = fuelMergeMaps(cloud, mine);
+    if(JSON.stringify(fuelCanon(merged)) !== JSON.stringify(fuelCanon(cloud))){
+      tx.set(userRef, { fuelBalances: fuelCanon(merged) }, { merge: true });
+      wrote = true;
+    }
+    return merged;
+  })).then(merged => {
+    if(currentUID !== uid || authGeneration !== gen) return;
+    const changed = fuelApplyCloud(merged);   // облако теперь = merged; свежие локальные правки за время отправки уйдут следующим кругом
+    fuelSetError('');
+    if(changed){
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(stateSnapshot())); }catch(e){}
+      try{ if(currentSection === 'fuel') renderExpenses(); }catch(e){}
+    }
+    if(wrote) diagSafe(() => DIAG.log('fuel.sync.ok', 'info', 'firebase:flushFuelBalances', { msg: 'Остатки топлива отправлены в облако (месяцев: ' + Object.keys(merged).length + ')' }));
+  }).catch(e => {
+    if(currentUID !== uid || authGeneration !== gen) return;
+    const code = e && e.code ? e.code : (e && e.message ? e.message : 'ошибка');
+    console.warn('Не удалось отправить остатки топлива:', e);
+    // Нет связи / сервис временно недоступен — это не ошибка для пользователя: тихо повторим позже.
+    const quiet = navigator.onLine === false || code === 'unavailable' || code === 'deadline-exceeded';
+    if(quiet){
+      fuelRetryTimer = setTimeout(() => { fuelRetryTimer = null; flushFuelBalances(); }, 15000);
+      return;
+    }
+    fuelSetError(code);
+    diagSafe(() => DIAG.log('fuel.sync.fail', 'error', 'firebase:flushFuelBalances', { now: true, msg: 'Остатки топлива не отправлены в облако: ' + code + (code === 'permission-denied' ? ' (правила Firestore не разрешают запись поля fuelBalances)' : ''), d: { code, months: Object.keys(mine).length } }));
+    // permission-denied само не повторяется (нет смысла); остальное — через 15 секунд
+    if(code !== 'permission-denied') fuelRetryTimer = setTimeout(() => { fuelRetryTimer = null; flushFuelBalances(); }, 15000);
+  }).then(() => {
+    fuelFlushInFlight = null;
+    if(fuelFlushAgain){ fuelFlushAgain = false; flushFuelBalances(); }   // состояние проверяется заново, для текущего аккаунта
+  });
+  fuelFlushInFlight = run;
+  return run;
+}
+window.addEventListener('online', () => { flushFuelBalances(); });
 // Замена остатков целиком (импорт файла / восстановление копии): значения копии становятся «свежей правкой»,
 // месяцы, которых в копии нет, гасятся (null) — иначе облачная версия вернула бы их обратно.
 function fuelReplaceAll(src, prev){
   const now = Date.now();
   const nm = fuelSanitizeMap(src);
-  Object.keys(nm).forEach(k => { nm[k].et = now; });
-  Object.keys(prev || {}).forEach(k => { if(!(k in nm)) nm[k] = { s: null, e: null, et: now }; });
+  Object.keys(nm).forEach(k => { nm[k].ts = now; nm[k].te = now; nm[k].et = now; });
+  Object.keys(prev || {}).forEach(k => { if(!(k in nm)) nm[k] = { s: null, e: null, ts: now, te: now, et: now }; });
   fuelBalances = nm;
 }
 function fuelPrevKey(key){ return monthKeyShift(key, -1); }
@@ -9644,8 +9760,7 @@ function fuelNextKey(key){ return monthKeyShift(key, 1); }
 function fuelMonthData(key){
   let fuelled = 0, known = 0, missing = 0;
   expenses.forEach(e => {
-    const d = new Date(e.createdAt);
-    if((d.getFullYear() + '-' + (d.getMonth() + 1)) !== key) return;
+    if(expMonthKeyOf(e) !== key) return;   // по дате расхода (у старых — по дню создания)
     if(!expIsFuel(e)) return;
     const l = expLiters(e);
     if(l == null) missing++; else { fuelled += l; known++; }
@@ -9669,9 +9784,13 @@ function fuelMonthData(key){
 }
 // Запись остатка месяца. field: 's' | 'e'. value: число >= 0 или null (очистить).
 function fuelSetBalance(key, field, value){
-  const old = fuelBalances[key] || { s: null, e: null, et: 0 };
-  const ent = { s: old.s, e: old.e, et: Date.now() };
+  const now = Date.now();
+  const old = fuelBalances[key] || { s: null, e: null, ts: 0, te: 0, et: 0 };
+  const ent = { s: old.s, e: old.e, ts: old.ts, te: old.te, et: old.et };
+  const tk = field === 's' ? 'ts' : 'te';
   ent[field] = value;
+  ent[tk] = Math.max(now, (old[tk] || 0) + 1);   // строго новее прежней отметки этого поля
+  ent.et = Math.max(ent.ts, ent.te);
   fuelBalances[key] = ent;
   let note = '';
   // Конец месяца становится началом следующего: вручную введённое начало следующего месяца больше не нужно
@@ -9681,7 +9800,8 @@ function fuelSetBalance(key, field, value){
     const nx = fuelBalances[nk];
     if(nx && nx.s != null && value != null){
       if(Math.abs(nx.s - value) > 0.005) note = 'Начало месяца «' + monthNameOf(nk).toLowerCase() + '» теперь ' + fuelFmt(value) + ' (было введено вручную ' + fuelFmt(nx.s) + ')';
-      fuelBalances[nk] = { s: null, e: nx.e, et: Date.now() };
+      const nts = Math.max(now, (nx.ts || 0) + 1);
+      fuelBalances[nk] = { s: null, e: nx.e, ts: nts, te: nx.te, et: Math.max(nts, nx.te || 0) };
     }
   }
   saveState();
@@ -9706,14 +9826,21 @@ function renderFuelBlock(){
   else if(d.status === 'missing') cons = `<span class="fuel-val warn" id="fuelConsumedVal">Недостаточно данных: у ${d.missing} ${d.missing === 1 ? 'заправки' : 'заправок'} не указаны литры</span>`;
   else if(d.status === 'impossible') cons = `<span class="fuel-val bad" id="fuelConsumedVal">Ошибка: остаток на конец больше, чем начало + заправлено</span>`;
   else cons = `<span class="fuel-val warn" id="fuelConsumedVal">Недостаточно данных</span>`;
+  let syncLine = '';
+  if(fuelSyncError) syncLine = `<div class="fuel-sync-line err" id="fuelSyncLine">Остатки не отправлены в облако (${escapeHtml(fuelSyncError)}) — нажмите, чтобы повторить</div>`;
+  else if(fuelDirty() && navigator.onLine === false) syncLine = `<div class="fuel-sync-line" id="fuelSyncLine">Остатки сохранены на телефоне и отправятся, когда появится связь</div>`;
   box.innerHTML = `
     <div class="fuel-block-title">Топливо за месяц</div>
     ${startRow}
     <div class="fuel-row"><span class="fuel-lbl">Заправлено${fuelledSub}</span><span class="fuel-val" id="fuelFuelledVal">${fuelFmt(d.fuelled)}</span></div>
     <div class="fuel-row"><span class="fuel-lbl">Остаток на конец</span><span class="fuel-in-wrap"><input class="fuel-in" id="fuelEndIn" data-fuel="e" inputmode="decimal" placeholder="—" value="${fuelInputStr(d.end)}"><span>л</span></span></div>
-    <div class="fuel-row fuel-total"><span class="fuel-lbl">Израсходовано</span>${cons}</div>`;
+    <div class="fuel-row fuel-total"><span class="fuel-lbl">Израсходовано</span>${cons}</div>
+    ${syncLine}`;
   box.style.display = 'block';
 }
+document.getElementById('expFuelBlock').addEventListener('click', (e) => {
+  if(e.target.closest && e.target.closest('#fuelSyncLine.err')){ flushFuelBalances(); showToast('Повторная отправка…'); }
+});
 document.getElementById('expFuelBlock').addEventListener('keydown', (e) => {
   if(e.key === 'Enter' && e.target.classList && e.target.classList.contains('fuel-in')){ e.preventDefault(); e.target.blur(); }
 });
@@ -9782,13 +9909,13 @@ function renderExpHistoryList(){
     el.innerHTML = `<div class="empty">Расходов за этот месяц пока нет. Нажмите «+», чтобы добавить.</div>`;
     return;
   }
-  const sorted = list.slice().sort((a,b) => b.createdAt - a.createdAt);
+  const sorted = list.slice().sort((a,b) => { const da = expDay(a), db2 = expDay(b); return da === db2 ? (b.createdAt - a.createdAt) : (db2 < da ? -1 : 1); });
   el.innerHTML = sorted.map(e => `
     <div class="exp-card" data-expopen="${e.id}">
       <div class="exp-main">
         <span class="exp-cat">${escapeHtml(e.category)}</span>
         <span class="exp-amount">${formatAmount(e.amount)}</span>
-        <span class="exp-meta">${formatNoteDate(e.createdAt)}</span>
+        <span class="exp-meta">${formatNoteDate(expDayTs(e))}</span>
         ${expLiters(e) != null ? `<span class="exp-liters">${fuelFmt(expLiters(e))}</span>` : (expIsFuel(e) ? `<span class="exp-liters none">литры не указаны</span>` : '')}
       </div>
       <button class="exp-edit" data-expedit="${e.id}">
@@ -9840,6 +9967,7 @@ const expCatRow = document.getElementById('expCatRow');
 const expCatNewInput = document.getElementById('expCatNewInput');
 const expAmountInput = document.getElementById('expAmountInput');
 const expLitersInput = document.getElementById('expLitersInput');
+const expDateInput = document.getElementById('expDateInput');
 let expLitersManual = false;   // человек сам включил поле литров для категории с другим названием
 let expNotFuel = false;        // человек нажал «Это не заправка»: при сохранении убрать признак fuel и литры
 let expFuelFlag = false;       // у редактируемого расхода уже есть признак заправки (fuel:true или любое liters)
@@ -9913,10 +10041,15 @@ function updateExpLitersUI(){
 function updateExpSaveBtnState(){
   const amount = parseExactAmount(expAmountInput.value);
   const litersOk = !expLitersVisible() || fuelParse(expLitersInput.value, false).ok;
-  const ok = expSelectedCategory && amount > 0 && litersOk;
+  const dv = expDateInput.value;
+  const dateOk = expDateValid(dv) && dv <= expTodayStr();   // пусто, мусор и будущее — нельзя
+  document.getElementById('expDateRow').classList.toggle('bad', !dateOk);
+  const ok = expSelectedCategory && amount > 0 && litersOk && dateOk;
   document.getElementById('expSaveBtn').disabled = !ok;
 }
 expAmountInput.addEventListener('input', updateExpSaveBtnState);
+expDateInput.addEventListener('input', updateExpSaveBtnState);
+expDateInput.addEventListener('change', updateExpSaveBtnState);
 expLitersInput.addEventListener('input', () => { updateExpLitersUI(); updateExpSaveBtnState(); });
 expLitersInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter'){ e.preventDefault(); expLitersInput.blur(); }
@@ -9945,6 +10078,8 @@ function openExpenseSheet(id){
   expCatNewInput.style.display = 'none';
   renderExpCatRow();
   expAmountInput.value = entry ? String(entry.amount).replace('.', ',') : '';
+  expDateInput.max = expTodayStr();
+  expDateInput.value = entry ? expDay(entry) : expTodayStr();   // новый — сегодня; существующий — его день (у старых день создания)
   expLitersManual = false;
   expNotFuel = false;
   expFuelFlag = !!entry && (entry.fuel === true || entry.liters != null);
@@ -9970,6 +10105,9 @@ document.getElementById('expSaveBtn').addEventListener('click', () => {
   const litersShown = expLitersVisible();
   const lr = litersShown ? fuelParse(expLitersInput.value, false) : { ok: true, value: null };
   if(!lr.ok) return;
+  const dv = expDateInput.value;
+  if(!(expDateValid(dv) && dv <= expTodayStr())) return;
+  let savedEntry = null;
   if(editingExpenseId != null){
     const entry = expenses.find(x => x.id === editingExpenseId);
     if(entry){
@@ -9977,18 +10115,30 @@ document.getElementById('expSaveBtn').addEventListener('click', () => {
       if(lr.value != null) entry.liters = lr.value; else delete entry.liters;   // явное удаление, независимо от видимости поля
       if(litersShown) entry.fuel = true;
       else if(expNotFuel) delete entry.fuel;   // явная отмена признака заправки
+      if(dv !== expDay(entry)) entry.date = dv;   // дату не трогали — запись остаётся как была (у старых расходов поля date нет)
+      savedEntry = entry;
     }
     showToast('Расход изменён');
   } else {
     const ne = { id: expenseIdSeq++ + '_' + Math.random().toString(36).slice(2, 8), category: expSelectedCategory, amount, createdAt: Date.now(), editedAt: Date.now() };
     if(lr.value != null) ne.liters = lr.value;
     if(litersShown) ne.fuel = true;
+    ne.date = dv;
     expenses.push(ne);
+    savedEntry = ne;
     showToast('Расход добавлен');
   }
   saveState();
   closeExpenseSheet();
   renderExpenses();
+  // Дата увела расход в другой месяц, чем открыт на экране — скажем, где его искать.
+  try{
+    if(savedEntry){
+      const shownKey = computeExpenseMonth(viewedExpMonthOffset).key;
+      const k = expMonthKeyOf(savedEntry);
+      if(k !== shownKey) showToast('Расход записан в месяц «' + monthNameOf(k).toLowerCase() + '»');
+    }
+  }catch(e){}
 });
 document.getElementById('expDeleteBtn').addEventListener('click', () => {
   if(editingExpenseId == null) return;
@@ -13016,7 +13166,12 @@ function applyState(s){
   expenseCategories = s.expenseCategories || [];
   // Остатки дизеля: объект — применяем; {} (сброс при входе/выходе) — очищаем; ключа нет (старая копия) — оставляем как есть.
   if(s.fuelBalances && typeof s.fuelBalances === 'object' && !Array.isArray(s.fuelBalances)) fuelBalances = fuelSanitizeMap(s.fuelBalances);
-  else if(!Object.keys(s).length) fuelBalances = {};
+  else if(!Object.keys(s).length){
+    fuelBalances = {};
+    // сброс при входе/выходе: ничего от прежнего аккаунта (в том числе «что лежит в облаке» и ошибка отправки) не переносим
+    lastSyncedFuelJSON = null; fuelSyncError = '';
+    if(fuelRetryTimer){ clearTimeout(fuelRetryTimer); fuelRetryTimer = null; }
+  }
   localUpdatedAt = toMillis(s.updatedAt);
   diagSafe(() => DIAG.diff('applyState'));
 }
@@ -13064,10 +13219,9 @@ function persistSyncedNotesMap(){
   try{ localStorage.setItem(SYNCED_NOTES_KEY, JSON.stringify(Array.from(lastSyncedNotes.entries()))); } catch(e){}
 }
 function metaSnapshotForSync(){
-  const m = { idSeq, expenseIdSeq, monthKey, monthlyGoal, expenseCategories };
-  // Ключ добавляем только когда есть что хранить — у тех, кто учёт топлива не использует, документ не меняется.
-  if(Object.keys(fuelBalances).length) m.fuelBalances = fuelCanon(fuelBalances);
-  return m;
+  // fuelBalances здесь НЕТ: остатки топлива отправляются отдельной цепочкой (flushFuelBalances), чтобы отказ правил или
+  // сбой по ним не блокировал заявки и расходы.
+  return { idSeq, expenseIdSeq, monthKey, monthlyGoal, expenseCategories };
 }
 function saveState(){
   diagSafe(() => DIAG.diff('saveState'));
@@ -13285,6 +13439,7 @@ function flushCloudSave(){
   // чтобы ошибка правил Firestore для новой коллекции не ломала заявки/расходы.
   flushServiceFolders();
   flushCarNotes();
+  flushFuelBalances();   // остатки топлива — отдельная цепочка (см. flushFuelBalances)
   if(cloudSaveTimer){ clearTimeout(cloudSaveTimer); cloudSaveTimer = null; }
   if(cloudSaveInFlight){
     // Предыдущая отправка ещё летит — не запускаем вторую поверх неё (см.
@@ -14242,17 +14397,8 @@ function subscribeCloud(userRef, onBaselineReady, knownNoteIdsAtStart, writesAll
     // документе ('in'), а не его значение — тогда явное null/[] тоже применяется.
     if('monthlyGoal' in d) monthlyGoal = d.monthlyGoal;
     if('expenseCategories' in d) expenseCategories = d.expenseCategories || [];
-    let fuelAhead = false;
-    { const fm = fuelMergeIncoming(d.fuelBalances); fuelAhead = fm.localAhead; }  // поля в облаке может не быть вовсе — тогда локальные остатки тоже надо отправить
+    fuelApplyCloud(d.fuelBalances);   // поля в облаке может не быть вовсе — тогда локальные остатки будут отправлены
     lastSyncedMetaJSON = JSON.stringify(metaSnapshotForSync());
-    if(fuelAhead){
-      // У нас есть более новые остатки, чем в облаке: считаем облачным то, что там реально лежит, — тогда они уйдут.
-      const cm = metaSnapshotForSync();
-      const cl = fuelSanitizeMap(d.fuelBalances);
-      if(Object.keys(cl).length) cm.fuelBalances = fuelCanon(cl); else delete cm.fuelBalances;
-      lastSyncedMetaJSON = JSON.stringify(cm);
-      scheduleCloudSave();
-    }
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(stateSnapshot())); } catch(e){}
     renderContent();
   }, e => console.warn('Не удалось подписаться на служебные данные:', e)));
@@ -15747,17 +15893,8 @@ function refreshFromCloudOnResume(){
       // телефоне сюда не долетало.
       if('monthlyGoal' in d) monthlyGoal = d.monthlyGoal;
       if('expenseCategories' in d) expenseCategories = d.expenseCategories || [];
-      let fuelAhead2 = false;
-      { const fm2 = fuelMergeIncoming(d.fuelBalances); fuelAhead2 = fm2.localAhead; if(fm2.changed) touched = true; }
+      if(fuelApplyCloud(d.fuelBalances)) touched = true;
       lastSyncedMetaJSON = JSON.stringify(metaSnapshotForSync());
-      if(fuelAhead2){
-        const cm2 = metaSnapshotForSync();
-        const cl2 = fuelSanitizeMap(d.fuelBalances);
-        if(Object.keys(cl2).length) cm2.fuelBalances = fuelCanon(cl2); else delete cm2.fuelBalances;
-        lastSyncedMetaJSON = JSON.stringify(cm2);
-        touched = true;
-        scheduleCloudSave();
-      }
     }
     notesSnap.forEach(docSnap => {
       const id = docSnap.id;
