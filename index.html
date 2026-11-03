@@ -1280,7 +1280,7 @@
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-03 09:04 (Топливо: отдельная отправка остатков, дата расхода)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-03 18:00 (Категория «Топливо» встроенная, литры только в ней)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -1574,7 +1574,6 @@
       <span class="exp-amount-suffix">л</span>
     </div>
     <div class="exp-liters-hint" id="expLitersHint" style="display:none;"></div>
-    <button type="button" class="exp-liters-add" id="expLitersAddBtn" style="display:none;">+ литры (заправка дизеля)</button>
     <button type="button" class="exp-liters-add" id="expNotFuelBtn" style="display:none;"></button>
     <div class="exp-sheet-actions">
       <button class="exp-delete-btn" id="expDeleteBtn" style="display:none;">Удалить</button>
@@ -9590,6 +9589,11 @@ function computeExpenseMonth(offset){
 }
 
 // ---- Топливо: литры и остатки по месяцам ----
+// Встроенная постоянная категория «Топливо»: есть всегда (в списке не хранится), только в ней вводятся литры.
+const FUEL_CATEGORY = 'Топливо';
+// Старые расходы (созданные ДО введения встроенной категории) без признака fuel/liters, но с «топливным» названием
+// категории продолжают считаться заправкой по названию. Новые расходы в прочих категориях заправкой не считаются.
+const FUEL_NAME_RULE_UNTIL = Date.UTC(2026, 10, 3, 12, 0, 0);
 const FUEL_MAX_L = 5000;   // выше этого значения литры/остаток считаем опечаткой (невозможное значение)
 function isFuelCategory(cat){
   // Дизельная заправка: в названии есть «дизель/топливо/солярка/ДТ/заправка» и нет слов, которые делают категорию
@@ -9609,7 +9613,7 @@ function expLiters(e){
 }
 // Заправка — по устойчивому признаку fuel:true (ставится при сохранении с полем литров и не зависит от liters),
 // по наличию поля liters (в т.ч. некорректного) или по названию категории (старые расходы).
-function expIsFuel(e){ return !!e && (e.fuel === true || (e.liters != null) || isFuelCategory(e.category)); }
+function expIsFuel(e){ return !!e && (e.fuel === true || (e.liters != null) || e.category === FUEL_CATEGORY || ((e.createdAt || 0) < FUEL_NAME_RULE_UNTIL && isFuelCategory(e.category))); }
 function fuelRound(n){ return Math.round(n * 100) / 100; }
 function fuelFmt(n){ return Number(fuelRound(n)).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' л'; }
 function fuelInputStr(n){ return n == null ? '' : String(fuelRound(n)).replace('.', ','); }
@@ -9813,8 +9817,7 @@ function renderFuelBlock(){
   const ae = document.activeElement;
   if(ae && ae.classList && ae.classList.contains('fuel-in') && box.contains(ae)) return; // человек набирает число — не сбиваем ввод
   const { key } = computeExpenseMonth(viewedExpMonthOffset);
-  const show = expenseCategories.some(isFuelCategory) || expenses.some(e => e.fuel === true || e.liters != null) || Object.keys(fuelBalances).length > 0;
-  if(!show){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  // «Топливо» — встроенная категория, поэтому блок «Топливо за месяц» доступен всегда.
   const d = fuelMonthData(key);
   const prevName = monthNameOf(fuelPrevKey(key)).toLowerCase();
   const startRow = d.startFromPrev
@@ -9968,12 +9971,12 @@ const expCatNewInput = document.getElementById('expCatNewInput');
 const expAmountInput = document.getElementById('expAmountInput');
 const expLitersInput = document.getElementById('expLitersInput');
 const expDateInput = document.getElementById('expDateInput');
-let expLitersManual = false;   // человек сам включил поле литров для категории с другим названием
 let expNotFuel = false;        // человек нажал «Это не заправка»: при сохранении убрать признак fuel и литры
 let expFuelFlag = false;       // у редактируемого расхода уже есть признак заправки (fuel:true или любое liters)
 
+function expAllCategories(){ return [FUEL_CATEGORY].concat(expenseCategories.filter(c => c !== FUEL_CATEGORY)); }
 function renderExpCatRow(){
-  const chips = expenseCategories.map(cat => `
+  const chips = expAllCategories().map(cat => `
     <button class="exp-cat-chip ${cat === expSelectedCategory ? 'active' : ''}" data-expcat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>
   `).join('');
   expCatRow.innerHTML = chips + `<button class="exp-cat-chip exp-cat-add" id="expCatAddBtn">+ своя</button>`;
@@ -10003,7 +10006,7 @@ function commitNewCategory(){
   expCatNewInput.style.display = 'none';
   expCatRow.style.display = 'flex';
   if(val){
-    if(!expenseCategories.includes(val)) expenseCategories.unshift(val);
+    if(val !== FUEL_CATEGORY && !expenseCategories.includes(val)) expenseCategories.unshift(val);   // «Топливо» — встроенная, в список не добавляем
     expSelectedCategory = val;
   }
   renderExpCatRow();
@@ -10015,19 +10018,16 @@ expCatNewInput.addEventListener('blur', () => {
   if(expCatNewInput.style.display !== 'none') commitNewCategory();
 });
 
-function expLitersVisible(){
-  if(expNotFuel && !isFuelCategory(expSelectedCategory)) return false;
-  return isFuelCategory(expSelectedCategory) || expLitersManual || expFuelFlag || expLitersInput.value.trim() !== '';
-}
+// Поле литров — только в категории «Топливо». У старого расхода из другой категории литры/признак заправки не трогаем.
+function expLitersVisible(){ return expSelectedCategory === FUEL_CATEGORY; }
 function updateExpLitersUI(){
-  if(isFuelCategory(expSelectedCategory)) expNotFuel = false;   // категория сама определяет заправку — «не заправка» неприменимо
+  if(expSelectedCategory === FUEL_CATEGORY) expNotFuel = false;   // в «Топливе» признак заправки отменять нельзя
   const vis = expLitersVisible();
   const nfBtn = document.getElementById('expNotFuelBtn');
-  const canNotFuel = expFuelFlag && !isFuelCategory(expSelectedCategory);
+  const canNotFuel = expFuelFlag && expSelectedCategory !== FUEL_CATEGORY;   // старый расход с признаком заправки в другой категории
   nfBtn.style.display = canNotFuel ? 'inline-block' : 'none';
   nfBtn.textContent = expNotFuel ? 'Вернуть: это заправка' : 'Это не заправка (убрать признак и литры)';
   document.getElementById('expLitersRow').style.display = vis ? 'flex' : 'none';
-  document.getElementById('expLitersAddBtn').style.display = (!vis && !expNotFuel && expSelectedCategory) ? 'inline-block' : 'none';
   const hint = document.getElementById('expLitersHint');
   const r = fuelParse(expLitersInput.value, false);
   if(vis && !r.ok){
@@ -10060,12 +10060,6 @@ document.getElementById('expNotFuelBtn').addEventListener('click', () => {
   updateExpLitersUI();
   updateExpSaveBtnState();
 });
-document.getElementById('expLitersAddBtn').addEventListener('click', () => {
-  expLitersManual = true;
-  updateExpLitersUI();
-  updateExpSaveBtnState();
-  expLitersInput.focus();
-});
 expAmountInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter'){ e.preventDefault(); expAmountInput.blur(); }
 });
@@ -10080,7 +10074,6 @@ function openExpenseSheet(id){
   expAmountInput.value = entry ? String(entry.amount).replace('.', ',') : '';
   expDateInput.max = expTodayStr();
   expDateInput.value = entry ? expDay(entry) : expTodayStr();   // новый — сегодня; существующий — его день (у старых день создания)
-  expLitersManual = false;
   expNotFuel = false;
   expFuelFlag = !!entry && (entry.fuel === true || entry.liters != null);
   expLitersInput.value = entry && expLiters(entry) != null ? fuelInputStr(expLiters(entry)) : '';
@@ -10112,9 +10105,11 @@ document.getElementById('expSaveBtn').addEventListener('click', () => {
     const entry = expenses.find(x => x.id === editingExpenseId);
     if(entry){
       entry.category = expSelectedCategory; entry.amount = amount; entry.editedAt = Date.now();
-      if(lr.value != null) entry.liters = lr.value; else delete entry.liters;   // явное удаление, независимо от видимости поля
-      if(litersShown) entry.fuel = true;
-      else if(expNotFuel) delete entry.fuel;   // явная отмена признака заправки
+      if(litersShown){
+        if(lr.value != null) entry.liters = lr.value; else delete entry.liters;   // поле видно: пусто = явное удаление литров
+        entry.fuel = true;
+      } else if(expNotFuel){ delete entry.liters; delete entry.fuel; }   // явная отмена признака заправки
+      // иначе (расход в другой категории, поле скрыто): старые liters/fuel остаются как были
       if(dv !== expDay(entry)) entry.date = dv;   // дату не трогали — запись остаётся как была (у старых расходов поля date нет)
       savedEntry = entry;
     }
