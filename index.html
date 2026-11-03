@@ -1127,6 +1127,46 @@
     .phone{max-width:none;width:100%;height:100vh;border-radius:0;border:0;box-shadow:none;}
   }
 
+
+/* ===== DRIVER EDITION: independent navigation and visual language ===== */
+:root{--accent:#e99b29;--steel:#e99b29;--page-bg:#10191d;--navy:#15252b;--card-line:#dce3e2;--concrete:#eaf0ef;--bg:#f2f5f3;--surface:#fff;--surface-alt:#f8faf8;--ink:#172a30;--muted:#66787c;--line:#dce5e3}
+.phone[data-theme="dark"]{--accent:#ffc06a;--steel:#ffc06a;--navy:#101a1e;--bg:#121e22;--surface:#1d2b30;--surface-alt:#243338;--concrete:#2b3c40;--line:#35464a;--ink:#f3f7f5;--muted:#b0c1c1;--card-line:#364a4d}
+body{background:#15252b}
+.phone{max-width:470px;border-radius:20px;background:var(--bg)}
+header{background:var(--navy);padding:20px 18px 18px;gap:12px;position:relative}
+header::before{content:'В РЕЙСЕ';position:absolute;left:68px;top:3px;color:#f4b452;font-size:10px;font-weight:900;letter-spacing:2px;pointer-events:none}
+header .icon-btn{width:40px;height:44px;border-radius:12px;background:#263d43;color:#fff}
+.search{margin-top:10px;background:#2a4047;border:1px solid #41545a;border-radius:13px;padding:12px 13px;min-width:0}
+.search input{font-size:16px;color:white}
+.search input::placeholder{color:#b3c2c3}
+.avatar{margin-top:10px;width:42px;height:42px;border-radius:13px;background:#f4b452;color:#17272b;box-shadow:none;font-weight:900}
+.top-tabs{display:none!important}
+main{background:var(--bg);padding:20px 16px 132px;scrollbar-width:thin}
+.section-label{font-size:12px;letter-spacing:1.2px;color:var(--muted);font-weight:900;margin:10px 3px 14px}
+.summary-bar,#summaryBar,#expSummaryBar{border:0;border-radius:18px;background:var(--navy);color:#fff;padding:18px 20px;box-shadow:0 8px 20px rgba(0,0,0,.10)}
+.note{height:auto;min-height:165px;background:var(--surface)!important;border:1px solid var(--card-line);border-radius:19px;padding:20px 18px;box-shadow:0 4px 14px rgba(14,36,37,.045);margin-bottom:0}
+.note h4{font-size:24px;letter-spacing:-.6px}
+.note .note-num{font-size:12px;letter-spacing:.4px}
+.note p{font-size:15px;line-height:1.55}
+.grid{gap:12px}
+.cargo-toggle{background:var(--concrete);border-radius:15px;padding:5px;gap:4px;margin-bottom:18px}
+.cargo-btn{border-radius:11px;min-height:43px;font-size:14px;font-weight:800}
+.exp-view-toggle{background:var(--concrete);border-radius:14px;padding:5px;gap:4px}
+.exp-view-btn{border-radius:10px;min-height:40px;font-weight:700}
+.fuel-block,.svc-card,.inc-month-card{border-radius:19px!important;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+.svc-card{padding:18px!important;min-height:80px}
+.global-fab{bottom:max(103px,calc(env(safe-area-inset-bottom) + 88px));right:20px;width:64px;height:64px;background:#f2ae45;color:#18292d;border:3px solid var(--bg);font-size:40px;font-weight:500;box-shadow:0 10px 25px rgba(22,34,35,.25)}
+.driver-dock{display:flex;position:absolute;bottom:0;left:0;right:0;z-index:18;background:var(--navy);padding:11px 10px max(14px,env(safe-area-inset-bottom));border-top:1px solid #30464c;gap:6px;box-shadow:0 -8px 25px rgba(0,0,0,.09)}
+.driver-dock button{flex:1;min-width:0;border:0;background:transparent;color:#b5c4c5;min-height:58px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer}
+.driver-dock button svg{width:24px;height:24px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.driver-dock button.active{background:#32474b;color:#ffbd5b}
+.driver-dock button:active{transform:scale(.97)}
+.nav-bar{margin-bottom:16px}
+.nav-title{font-size:21px;font-weight:900}
+input,textarea,select{font-size:16px}
+button{touch-action:manipulation}
+@media(max-width:520px){.phone{height:100dvh;max-width:none;border-radius:0}body{background:var(--bg)}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -1276,11 +1316,17 @@
 
   <button class="global-fab" id="globalFab" type="button" aria-label="Добавить">+</button>
 
+
+  <nav class="driver-dock" id="driverDock" aria-label="Основные разделы">
+    <button type="button" data-driver="notes" class="active" aria-label="Грузы"><svg viewBox="0 0 24 24"><path d="M3 7h12v11H3zM15 11h4l3 4v3h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg><span>Грузы</span></button>
+    <button type="button" data-driver="fuel" aria-label="Расходы и топливо"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="18" rx="2"/><path d="M7 7h6M7 11h6M16 8h2l2 3v7a2 2 0 0 0 2 0v-6"/></svg><span>Расходы</span></button>
+    <button type="button" data-driver="service" aria-label="Автосервис"><svg viewBox="0 0 24 24"><path d="M14 5a5 5 0 0 0-6 6l-6 6a2 2 0 0 0 3 3l6-6a5 5 0 0 0 6-6l-3 3-3-3z"/></svg><span>Сервис</span></button>
+  </nav>
   <div class="overlay" id="overlay"></div>
   <nav class="drawer" id="drawer">
     <div class="brand">В рейсе</div>
     <div id="drawerEmail" style="margin:-16px 22px 16px;font-size:12.5px;color:var(--muted);word-break:break-all;"></div>
-    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-03 18:00 (Категория «Топливо» встроенная, литры только в ней)</div>
+    <div id="appVersionLine" style="margin:-12px 22px 16px;font-size:16.5px;color:var(--muted);opacity:.7;user-select:none;-webkit-user-select:none;">Версия: 2026-11-03 — Driver Edition (тестовый дизайн)</div>
     <div id="offlinePhotoStatus" style="display:none;margin:-8px 22px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;" title="Фото заявок сохраняются на телефоне, чтобы открываться без интернета"></div>
     <button class="active" data-view="notes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 L3 14h7l-1 8 10-12h-7z"/></svg>
@@ -16118,5 +16164,29 @@ function refreshFromCloudOnResume(){
 })();
 </script>
 
+<script>
+/* Visual-only navigation adapter: existing handlers remain the source of truth. */
+(function(){
+  var dock=document.getElementById('driverDock');
+  var tabs=document.getElementById('topTabs');
+  if(!dock||!tabs)return;
+  function syncDock(){
+    var active=tabs.querySelector('.top-tab.active');
+    var key=active?active.getAttribute('data-section'):'notes';
+    dock.querySelectorAll('[data-driver]').forEach(function(b){
+      var selected=b.getAttribute('data-driver')===key;
+      b.classList.toggle('active',selected);
+      b.setAttribute('aria-current',selected?'page':'false');
+    });
+  }
+  dock.addEventListener('click',function(e){
+    var b=e.target.closest('[data-driver]');if(!b)return;
+    var tab=tabs.querySelector('.top-tab[data-section="'+b.getAttribute('data-driver')+'"]');
+    if(tab){tab.click();syncDock();}
+  });
+  new MutationObserver(syncDock).observe(tabs,{subtree:true,attributes:true,attributeFilter:['class']});
+  syncDock();
+})();
+</script>
 </body>
 </html>
